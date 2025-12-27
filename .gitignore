@@ -1,0 +1,13 @@
+# Ignore runtime and large artifacts
+downloads/
+logs/
+cache/
+.history/
+__pycache__/
+*.pyc
+.env
+.vscode/
+*.mp4
+*.bin
+*.pth
+*.pt
