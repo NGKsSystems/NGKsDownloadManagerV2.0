@@ -1,0 +1,63 @@
+2026-02-01 09:58:51,673 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download 5ecb6b11d75d: https://httpbin.org/bytes/1024
+2026-02-01 09:58:51,673 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/1024
+2026-02-01 09:58:53,057 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:58:53,058 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 1024
+2026-02-01 09:58:53,059 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:58:53,059 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download 5ecb6b11d75d
+2026-02-01 09:58:54,507 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 1.45s, 1024 bytes
+2026-02-01 09:58:54,508 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download e5f9b6e85872: https://httpbin.org/bytes/1024
+2026-02-01 09:58:54,509 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/1024
+2026-02-01 09:58:55,699 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:58:55,699 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 1024
+2026-02-01 09:58:55,701 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:58:55,701 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download e5f9b6e85872
+2026-02-01 09:58:56,858 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 1.16s, 1024 bytes
+2026-02-01 09:58:56,860 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download 3d331a815fc7: https://httpbin.org/bytes/102400
+2026-02-01 09:58:56,860 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/102400
+2026-02-01 09:58:58,908 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:58:58,908 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 102400
+2026-02-01 09:58:58,910 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:58:58,911 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download 3d331a815fc7
+2026-02-01 09:58:59,880 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 0.97s, 102400 bytes
+2026-02-01 09:58:59,894 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download 5f7adaad6fea: https://httpbin.org/bytes/102400
+2026-02-01 09:58:59,894 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/102400
+2026-02-01 09:59:01,877 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:59:01,877 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 102400
+2026-02-01 09:59:01,879 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:59:01,880 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download 5f7adaad6fea
+2026-02-01 09:59:03,052 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 1.17s, 102400 bytes
+2026-02-01 09:59:03,054 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download 49e6e2acaa30: https://httpbin.org/bytes/1048576
+2026-02-01 09:59:03,054 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/1048576
+2026-02-01 09:59:04,454 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:59:04,454 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 102400
+2026-02-01 09:59:04,455 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:59:04,456 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download 49e6e2acaa30
+2026-02-01 09:59:05,049 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 0.59s, 102400 bytes
+2026-02-01 09:59:05,051 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download ff6434c237ad: https://httpbin.org/bytes/1048576
+2026-02-01 09:59:05,051 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/1048576
+2026-02-01 09:59:06,587 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:59:06,587 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 102400
+2026-02-01 09:59:06,589 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:59:06,589 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download ff6434c237ad
+2026-02-01 09:59:07,100 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 0.51s, 102400 bytes
+2026-02-01 09:59:07,101 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download c93dd557f406: https://httpbin.org/bytes/5242880
+2026-02-01 09:59:07,102 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/5242880
+2026-02-01 09:59:08,603 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:59:08,603 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 102400
+2026-02-01 09:59:08,605 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:59:08,605 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download c93dd557f406
+2026-02-01 09:59:08,994 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 0.39s, 102400 bytes
+2026-02-01 09:59:09,008 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download 5098154a58c8: https://httpbin.org/bytes/5242880
+2026-02-01 09:59:09,009 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/5242880
+2026-02-01 09:59:10,734 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:59:10,734 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 102400
+2026-02-01 09:59:10,736 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:59:10,736 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download 5098154a58c8
+2026-02-01 09:59:11,212 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 0.48s, 102400 bytes
+2026-02-01 09:59:11,218 - verified_multi_downloader.MultiConnectionDownloader - INFO - Starting download 38b3281f1843: https://httpbin.org/bytes/5242880
+2026-02-01 09:59:11,218 - verified_multi_downloader.ServerCapability - INFO - Checking server capabilities for: https://httpbin.org/bytes/5242880
+2026-02-01 09:59:13,140 - verified_multi_downloader.ServerCapability - WARNING -    Accept-Ranges: 
+2026-02-01 09:59:13,140 - verified_multi_downloader.ServerCapability - WARNING -    Content-Length: 102400
+2026-02-01 09:59:13,142 - verified_multi_downloader.MultiConnectionDownloader - INFO - Falling back to single-connection download
+2026-02-01 09:59:13,142 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download 38b3281f1843
+2026-02-01 09:59:15,750 - verified_multi_downloader.MultiConnectionDownloader - INFO - Single-connection download completed: 2.61s, 102400 bytes

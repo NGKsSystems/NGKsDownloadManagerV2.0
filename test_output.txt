@@ -1,0 +1,4 @@
+  File "C:\Users\suppo\Desktop\NGKsSystems\NGKs DL Manager V2.0\test_v21_acceptance.py", line 204
+    print(\"\\n=== Test 3: Interruption and Resume ===\")
+           ^
+SyntaxError: unexpected character after line continuation character

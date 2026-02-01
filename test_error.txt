@@ -1,0 +1,2 @@
+ERROR:root:Multi-connection: failed - 2 segments failed
+ERROR:root:Single-connection: failed - Download cancelled by user

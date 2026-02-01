@@ -18,6 +18,7 @@ class URLDetector:
         self.youtube_patterns = [
             r'youtube\.com/watch\?v=',
             r'youtu\.be/',
+            r'youtube\.com/shorts/',
             r'youtube\.com/playlist\?list=',
             r'youtube\.com/channel/',
             r'youtube\.com/user/',

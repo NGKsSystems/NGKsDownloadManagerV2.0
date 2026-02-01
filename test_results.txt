@@ -1,0 +1,42 @@
+ERROR:root:Multi-connection: failed - 2 segments failed
+ERROR:root:Single-connection: failed - Download cancelled by user
+Download Manager V2.1 Acceptance Test
+==================================================
+Test directory: C:\Users\suppo\AppData\Local\Temp\v21_acceptance_tgm7gqj_
+Server started at: http://localhost:56500
+Creating 12MB test file...
+Source file hash: c2762aa871303028d6915f39bd927470cd12c59dc78e277edfd6615f66cbb680
+
+=== Test 1: Multi-Connection Mode ===
+Downloading http://localhost:56500/range/testfile.dat
+Expected: multi-connection mode, 4 connections
+PASS: Multi-mode verified (mode=multi, connections=4, time=8.82s)
+
+=== Test 2: Single-Connection Fallback ===
+Downloading http://localhost:56500/norange/testfile.dat
+Expected: single-connection fallback
+PASS: Single fallback verified (mode=single, connections=1)
+
+=== Test 3: Interruption and Resume ===
+Testing interruption and resume for http://localhost:56500/range/testfile.dat
+(Using slow mode for reliable interruption)
+Phase 1: Starting download and interrupting...
+Waiting for part files to appear...
+Part files found, triggering cancellation...
+Download result: success=False
+Download was interrupted as expected
+
+==================================================
+FINAL RESULTS
+==================================================
+PASS: Multi-Connection Mode - mode=multi, connections=4
+PASS: Single-Connection Fallback - mode=single, connections=1
+FAIL: Interruption & Resume - Download failed but no state file
+
+Overall: 2/3 tests passed
+
+V2.1 ACCEPTANCE: 1 TESTS FAILED
+
+Teardown:
+Server stopped
+Test directory cleaned

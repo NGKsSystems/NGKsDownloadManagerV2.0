@@ -31,6 +31,9 @@ class DownloadManagerGUI:
         self.root.geometry("800x600")
         self.root.minsize(600, 400)
         
+        # Set background image
+        self.setup_background()
+        
         # Initialize managers
         self.config_manager = ConfigManager()
         self.history_manager = HistoryManager()
@@ -47,12 +50,64 @@ class DownloadManagerGUI:
         self.setup_ui()
         self.load_config()
         self.load_history()  # Load download history on startup
+        self.check_ytdlp_updates()  # Check for yt-dlp updates
+    
+    def setup_background(self):
+        """Setup background image for the application"""
+        try:
+            from PIL import Image, ImageTk
+            bg_path = os.path.join(os.path.dirname(__file__), "background.png")
+            if os.path.exists(bg_path):
+                # Load and resize image to fill window
+                bg_image = Image.open(bg_path)
+                bg_image = bg_image.resize((800, 600), Image.Resampling.LANCZOS)
+                self.bg_photo = ImageTk.PhotoImage(bg_image)
+                
+                # Create canvas for background
+                self.bg_canvas = tk.Canvas(self.root, width=800, height=600, highlightthickness=0)
+                self.bg_canvas.pack(fill=tk.BOTH, expand=True)
+                self.bg_canvas.create_image(0, 0, image=self.bg_photo, anchor=tk.NW, tags="bg")
+                
+                # Bind resize event to update background
+                self.root.bind('<Configure>', self.on_resize)
+            else:
+                # No background image, use solid color
+                self.root.configure(bg='#0a1928')
+        except Exception as e:
+            # Fallback to solid color if image loading fails
+            print(f"Background loading failed: {e}")
+            self.root.configure(bg='#0a1928')
+    
+    def on_resize(self, event):
+        """Handle window resize to update background"""
+        if hasattr(self, 'bg_canvas'):
+            try:
+                from PIL import Image, ImageTk
+                bg_path = os.path.join(os.path.dirname(__file__), "background.png")
+                if os.path.exists(bg_path):
+                    bg_image = Image.open(bg_path)
+                    bg_image = bg_image.resize((event.width, event.height), Image.Resampling.LANCZOS)
+                    self.bg_photo = ImageTk.PhotoImage(bg_image)
+                    self.bg_canvas.delete("bg")
+                    self.bg_canvas.create_image(0, 0, image=self.bg_photo, anchor=tk.NW, tags="bg")
+            except Exception:
+                pass
         
     def setup_ui(self):
         """Setup the main user interface"""
-        # Create notebook for tabs
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Create main container frame
+        if hasattr(self, 'bg_canvas'):
+            # Place widgets on canvas
+            main_container = ttk.Frame(self.bg_canvas)
+            self.bg_canvas.create_window(0, 0, window=main_container, anchor=tk.NW, tags="main")
+            
+            # Create notebook for tabs
+            self.notebook = ttk.Notebook(main_container)
+            self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 0))
+        else:
+            # No background, use root directly
+            self.notebook = ttk.Notebook(self.root)
+            self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 0))
         
         # Download tab
         self.download_frame = ttk.Frame(self.notebook)
@@ -69,6 +124,16 @@ class DownloadManagerGUI:
         self.notebook.add(self.history_frame, text="History")
         self.setup_history_tab()
         
+        # Status bar at bottom
+        if hasattr(self, 'bg_canvas'):
+            status_container = ttk.Frame(self.bg_canvas)
+            self.bg_canvas.create_window(0, 0, window=status_container, anchor=tk.SW, tags="status")
+            self.status_bar = ttk.Label(status_container, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
+            self.status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 10))
+        else:
+            self.status_bar = ttk.Label(self.root, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
+            self.status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 10))
+        
     def setup_download_tab(self):
         """Setup the main download interface"""
         # URL input section
@@ -79,6 +144,11 @@ class DownloadManagerGUI:
         self.url_entry = ttk.Entry(url_frame, textvariable=self.url_var, font=("Arial", 11))
         self.url_entry.pack(fill=tk.X, pady=(0, 10))
         self.url_entry.bind('<Return>', self.on_url_enter)
+        # Enable direct paste with Ctrl+V
+        self.url_entry.bind('<Control-v>', self.on_paste)
+        self.url_entry.bind('<Control-V>', self.on_paste)
+        # Enable right-click context menu
+        self.url_entry.bind('<Button-3>', self.show_url_context_menu)
         
         # URL analysis display
         self.url_info_var = tk.StringVar()
@@ -245,10 +315,177 @@ class DownloadManagerGUI:
         except tk.TclError:
             pass
     
+    def on_paste(self, event):
+        """Handle paste event in URL entry"""
+        try:
+            clipboard = self.root.clipboard_get()
+            if clipboard:
+                # Clear current selection and insert clipboard content
+                self.url_entry.delete(0, tk.END)
+                self.url_entry.insert(0, clipboard.strip())
+                return "break"  # Prevent default paste behavior
+        except tk.TclError:
+            pass
+        return None
+    
+    def show_url_context_menu(self, event):
+        """Show context menu for URL entry on right-click"""
+        menu = tk.Menu(self.root, tearoff=0)
+        
+        # Paste option
+        menu.add_command(label="Paste", command=self.paste_url, accelerator="Ctrl+V")
+        
+        # Cut option
+        def cut_text():
+            try:
+                if self.url_entry.selection_present():
+                    text = self.url_entry.selection_get()
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(text)
+                    self.url_entry.delete("sel.first", "sel.last")
+            except tk.TclError:
+                pass
+        
+        menu.add_command(label="Cut", command=cut_text, accelerator="Ctrl+X")
+        
+        # Copy option
+        def copy_text():
+            try:
+                if self.url_entry.selection_present():
+                    text = self.url_entry.selection_get()
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(text)
+                else:
+                    # Copy entire URL if no selection
+                    text = self.url_var.get()
+                    if text:
+                        self.root.clipboard_clear()
+                        self.root.clipboard_append(text)
+            except tk.TclError:
+                pass
+        
+        menu.add_command(label="Copy", command=copy_text, accelerator="Ctrl+C")
+        
+        menu.add_separator()
+        
+        # Clear option
+        menu.add_command(label="Clear", command=self.clear_url)
+        
+        # Select all option
+        def select_all():
+            self.url_entry.select_range(0, tk.END)
+            self.url_entry.icursor(tk.END)
+        
+        menu.add_command(label="Select All", command=select_all, accelerator="Ctrl+A")
+        
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+    
     def clear_url(self):
         """Clear URL input"""
         self.url_var.set("")
         self.url_info_var.set("")
+    
+    def check_ytdlp_updates(self):
+        """Check for yt-dlp updates and install if available"""
+        def update_check():
+            try:
+                import subprocess
+                import sys
+                
+                # Check current version
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "show", "yt-dlp"],
+                    capture_output=True,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                )
+                
+                if result.returncode != 0:
+                    return
+                
+                # Check for updates
+                check_result = subprocess.run(
+                    [sys.executable, "-m", "pip", "list", "--outdated"],
+                    capture_output=True,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                )
+                
+                if "yt-dlp" in check_result.stdout:
+                    # Update available
+                    response = messagebox.askyesno(
+                        "yt-dlp Update Available",
+                        "A new version of yt-dlp is available. Would you like to update it now?\n\n"
+                        "This will ensure compatibility with the latest video sites.",
+                        parent=self.root
+                    )
+                    
+                    if response:
+                        # Show progress dialog
+                        progress_dialog = tk.Toplevel(self.root)
+                        progress_dialog.title("Updating yt-dlp")
+                        progress_dialog.geometry("300x100")
+                        progress_dialog.transient(self.root)
+                        progress_dialog.grab_set()
+                        
+                        # Center dialog
+                        progress_dialog.update_idletasks()
+                        x = (progress_dialog.winfo_screenwidth() // 2) - 150
+                        y = (progress_dialog.winfo_screenheight() // 2) - 50
+                        progress_dialog.geometry(f"300x100+{x}+{y}")
+                        
+                        ttk.Label(progress_dialog, text="Updating yt-dlp...", font=("Arial", 10)).pack(pady=20)
+                        progress_bar = ttk.Progressbar(progress_dialog, mode="indeterminate")
+                        progress_bar.pack(fill=tk.X, padx=20, pady=10)
+                        progress_bar.start(10)
+                        
+                        def do_update():
+                            try:
+                                update_result = subprocess.run(
+                                    [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"],
+                                    capture_output=True,
+                                    text=True,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                                )
+                                
+                                progress_dialog.destroy()
+                                
+                                if update_result.returncode == 0:
+                                    messagebox.showinfo(
+                                        "Update Successful",
+                                        "yt-dlp has been successfully updated to the latest version!",
+                                        parent=self.root
+                                    )
+                                else:
+                                    messagebox.showerror(
+                                        "Update Failed",
+                                        f"Failed to update yt-dlp:\n{update_result.stderr}",
+                                        parent=self.root
+                                    )
+                            except Exception as e:
+                                progress_dialog.destroy()
+                                messagebox.showerror(
+                                    "Update Error",
+                                    f"Error updating yt-dlp: {str(e)}",
+                                    parent=self.root
+                                )
+                        
+                        update_thread = threading.Thread(target=do_update, daemon=True)
+                        update_thread.start()
+                else:
+                    # No update available - yt-dlp is current - show in status bar
+                    self.root.after(0, lambda: self.status_bar.config(text="yt-dlp is up to date"))
+                        
+            except Exception as e:
+                # Silently fail - don't interrupt app startup
+                print(f"Update check failed: {e}")
+        
+        # Run update check in background thread
+        thread = threading.Thread(target=update_check, daemon=True)
+        thread.start()
     
     def browse_destination(self):
         """Browse for destination folder"""
@@ -553,18 +790,13 @@ class DownloadManagerGUI:
             else:  # auto
                 format_selector = None
             
-            if format_selector:
-                # Use specific format
-                result = self.youtube_downloader.download_with_format(
-                    url, destination, format_selector, progress_callback
-                )
-            else:
-                # Use default download method
-                result = self.youtube_downloader.download(
-                    url, destination, progress_callback,
-                    extract_audio=audio_only,
-                    auto_quality=True
-                )
+            # Use the standard download method with quality setting
+            result = self.youtube_downloader.download(
+                url, destination, progress_callback,
+                extract_audio=audio_only,
+                auto_quality=(quality == 'auto'),
+                quality=format_selector if format_selector else 'best'
+            )
             
             # Handle the new dictionary result format
             if isinstance(result, dict) and result.get('status') == 'success':

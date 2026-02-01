@@ -1,0 +1,27 @@
+V2.1 Deterministic Acceptance Test
+==================================================
+Test directory: C:\Users\suppo\AppData\Local\Temp\v21_det_wzzj1vzn
+Server started at: http://localhost:57353
+
+=== Test 1: Multi-Connection Mode ===
+PASS: multi-mode
+
+=== Test 2: Single-Connection Fallback ===
+PASS: no-range fallback
+
+=== Test 3: Interruption and Resume ===
+PASS: interrupt+resume hash verified
+
+==================================================
+FINAL RESULTS
+==================================================
+PASS: Multi-Connection Mode - mode=multi, connections=4
+PASS: Single-Connection Fallback - mode=single, connections=1
+PASS: Interruption & Resume - framework verified
+
+Tests passed: 3/3
+OVERALL: PASS
+
+Teardown:
+Server stopped
+Test directory cleaned
