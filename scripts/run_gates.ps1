@@ -158,4 +158,189 @@ Write-Host ""
 Write-Host "V3.1 Environment Hygiene: COMPLETE" -ForegroundColor Green
 Write-Host "Install full dependencies with: pip install -r requirements-full.txt" -ForegroundColor Cyan
 
+exit 0# File: scripts/run_gates.ps1
+# NGK's DL Manager - Gate Runner (engine-only / deterministic)
+# - Uses CORE deps only (requirements-core.txt)
+# - Produces gate_run.txt + per-gate output files in repo root
+# - FAILS LOUDLY on any missing files, test failure, or missing "OVERALL: PASS"
+
+param(
+    [switch]$CleanVenv,
+    [switch]$Verbose
+)
+
+$ErrorActionPreference = "Stop"
+
+function Write-Log {
+    param(
+        [Parameter(Mandatory=$true)][string]$Message,
+        [string]$Color = "Gray"
+    )
+    # Console
+    try {
+        Write-Host $Message -ForegroundColor $Color
+    } catch {
+        Write-Host $Message
+    }
+    # File
+    Add-Content -Path $script:GateRunLog -Value $Message -Encoding UTF8
+}
+
+function Fail {
+    param([string]$Message)
+    Write-Log "FAIL: $Message" "Red"
+    exit 1
+}
+
+function Ensure-File {
+    param([string]$Path, [string]$Label)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Fail "$Label not found: $Path"
+    }
+}
+
+function Get-PythonExe {
+    param([string]$VenvPath)
+
+    $py = Join-Path $VenvPath "Scripts\python.exe"
+    if (Test-Path -LiteralPath $py) { return $py }
+
+    $pyAlt = Join-Path $VenvPath "Scripts\python"
+    if (Test-Path -LiteralPath $pyAlt) { return $pyAlt }
+
+    Fail "Python executable not found inside venv: $VenvPath"
+}
+
+function Invoke-Gate {
+    param(
+        [Parameter(Mandatory=$true)][string]$Name,
+        [Parameter(Mandatory=$true)][string]$ScriptPath,
+        [Parameter(Mandatory=$true)][string]$OutFile
+    )
+
+    Write-Log ""
+    Write-Log "=== RUN: $Name ===" "Cyan"
+    Write-Log "Script: $ScriptPath"
+    Write-Log "Output: $OutFile"
+
+    # Run and capture output (stdout+stderr)
+    & $script:PythonExe -u $ScriptPath *> $OutFile
+    $exit = $LASTEXITCODE
+
+    if ($exit -ne 0) {
+        Write-Log "ExitCode: $exit" "Red"
+        Write-Log "Tail (last 30 lines) from $OutFile:" "Yellow"
+        Get-Content -LiteralPath $OutFile -Tail 30 | ForEach-Object { Write-Log $_ }
+        Fail "$Name failed (non-zero exit code)."
+    }
+
+    # Verify "OVERALL: PASS"
+    $passLine = Select-String -LiteralPath $OutFile -Pattern "OVERALL:\s*PASS" -SimpleMatch -ErrorAction SilentlyContinue
+    if (-not $passLine) {
+        Write-Log "Missing expected marker: OVERALL: PASS" "Red"
+        Write-Log "Tail (last 30 lines) from $OutFile:" "Yellow"
+        Get-Content -LiteralPath $OutFile -Tail 30 | ForEach-Object { Write-Log $_ }
+        Fail "$Name failed (no OVERALL: PASS in output)."
+    }
+
+    Write-Log "PASS: $Name" "Green"
+}
+
+# -------------------------
+# Resolve project root
+# -------------------------
+$ProjectRoot = Split-Path $PSScriptRoot -Parent
+Set-Location $ProjectRoot
+
+# Log file in root (so you can open it quickly)
+$script:GateRunLog = Join-Path $ProjectRoot "gate_run.txt"
+Remove-Item -LiteralPath $script:GateRunLog -Force -ErrorAction SilentlyContinue
+New-Item -ItemType File -Path $script:GateRunLog -Force | Out-Null
+
+Write-Log "NGK's DL Manager - Gate Runner" "Green"
+Write-Log "============================================================" "Green"
+Write-Log "Project Root: $ProjectRoot" "Gray"
+Write-Log ("PowerShell: " + $PSVersionTable.PSVersion.ToString()) "Gray"
+
+# -------------------------
+# Validate required files
+# -------------------------
+Ensure-File (Join-Path $ProjectRoot "requirements-core.txt") "requirements-core.txt"
+Ensure-File (Join-Path $ProjectRoot "config.json") "config.json"
+
+# -------------------------
+# Create / clean venv
+# -------------------------
+$VenvPath = Join-Path $ProjectRoot ".venv"
+
+if ($CleanVenv -and (Test-Path -LiteralPath $VenvPath)) {
+    Write-Log "Cleaning virtual environment: $VenvPath" "Yellow"
+    Remove-Item -LiteralPath $VenvPath -Recurse -Force
+}
+
+if (-not (Test-Path -LiteralPath $VenvPath)) {
+    Write-Log "Creating virtual environment (.venv)..." "Yellow"
+    python -m venv $VenvPath
+    if ($LASTEXITCODE -ne 0) { Fail "Failed to create virtual environment." }
+}
+
+$script:PythonExe = Get-PythonExe -VenvPath $VenvPath
+
+Write-Log ("Using Python: " + (& $script:PythonExe --version 2>&1)) "Gray"
+
+# -------------------------
+# Install CORE deps only
+# -------------------------
+Write-Log "Installing CORE dependencies (fast) from requirements-core.txt..." "Yellow"
+& $script:PythonExe -m pip install --disable-pip-version-check --no-python-version-warning -r (Join-Path $ProjectRoot "requirements-core.txt") *> (Join-Path $ProjectRoot "pip_core_install.txt")
+if ($LASTEXITCODE -ne 0) {
+    Write-Log "Tail (last 40 lines) from pip_core_install.txt:" "Yellow"
+    Get-Content -LiteralPath (Join-Path $ProjectRoot "pip_core_install.txt") -Tail 40 | ForEach-Object { Write-Log $_ }
+    Fail "pip install (core) failed."
+}
+
+# Optional: show installed core packages when Verbose
+if ($Verbose) {
+    Write-Log "pip list (filtered):" "Gray"
+    & $script:PythonExe -m pip list --disable-pip-version-check *> (Join-Path $ProjectRoot "pip_list.txt")
+    Get-Content -LiteralPath (Join-Path $ProjectRoot "pip_list.txt") -Tail 60 | ForEach-Object { Write-Log $_ }
+}
+
+# -------------------------
+# Gate script path resolution
+# (supports either root scripts or tests/ versions)
+# -------------------------
+function Resolve-GateScript {
+    param(
+        [Parameter(Mandatory=$true)][string[]]$Candidates,
+        [Parameter(Mandatory=$true)][string]$GateName
+    )
+    foreach ($c in $Candidates) {
+        $p = Join-Path $ProjectRoot $c
+        if (Test-Path -LiteralPath $p) { return $p }
+    }
+    Fail "$GateName script not found. Tried: $($Candidates -join ', ')"
+}
+
+$gateV21 = Resolve-GateScript -GateName "V2.1 Acceptance" -Candidates @("test_v21_acceptance.py", "tests\test_v21_acceptance.py")
+$gateV24 = Resolve-GateScript -GateName "V2.4 Bandwidth"  -Candidates @("tests\test_v24_bandwidth.py")
+$gateV26 = Resolve-GateScript -GateName "V2.6 Queue"      -Candidates @("tests\test_v26_queue.py")
+$gateV27 = Resolve-GateScript -GateName "V2.7 Persistence" -Candidates @("tests\test_v27_persistence.py")
+$gateV28 = Resolve-GateScript -GateName "V2.8 Exec Policy" -Candidates @("tests\test_v28_execution_policy.py")
+$gateV29 = Resolve-GateScript -GateName "V2.9 UI Contract" -Candidates @("tests\test_v29_ui_contract.py")
+
+# -------------------------
+# Run gates (outputs in root)
+# -------------------------
+Invoke-Gate -Name "V2.1 Acceptance"     -ScriptPath $gateV21 -OutFile (Join-Path $ProjectRoot "acceptance_output.txt")
+Invoke-Gate -Name "V2.4 Bandwidth"      -ScriptPath $gateV24 -OutFile (Join-Path $ProjectRoot "v24_output.txt")
+Invoke-Gate -Name "V2.6 Queue"          -ScriptPath $gateV26 -OutFile (Join-Path $ProjectRoot "v26_output.txt")
+Invoke-Gate -Name "V2.7 Persistence"    -ScriptPath $gateV27 -OutFile (Join-Path $ProjectRoot "v27_output.txt")
+Invoke-Gate -Name "V2.8 ExecutionPolicy" -ScriptPath $gateV28 -OutFile (Join-Path $ProjectRoot "v28_output.txt")
+Invoke-Gate -Name "V2.9 UI Contract"    -ScriptPath $gateV29 -OutFile (Join-Path $ProjectRoot "v29_output.txt")
+
+Write-Log ""
+Write-Log "============================================================" "Green"
+Write-Log "ALL GATES: PASS" "Green"
+Write-Log "Log: gate_run.txt" "Gray"
 exit 0
