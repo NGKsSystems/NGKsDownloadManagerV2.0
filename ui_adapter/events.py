@@ -136,6 +136,31 @@ class UIEventManager:
         
         return events
     
+    def poll(self, max_items: int = 100) -> List[UIEvent]:
+        """Poll for events (required method for UI queue-based polling)"""
+        events = []
+        count = 0
+        
+        try:
+            while count < max_items:
+                event = self.event_queue.get_nowait()
+                events.append(event)
+                count += 1
+                
+                # Notify all subscribers
+                with self._lock:
+                    for subscriber in self.subscribers:
+                        try:
+                            subscriber(event)
+                        except Exception:
+                            # Don't let subscriber errors break event processing
+                            pass
+                            
+        except Empty:
+            pass
+        
+        return events
+    
     def clear_events(self):
         """Clear all pending events"""
         try:

@@ -224,6 +224,47 @@ class UIAdapter:
             pass
         return False
     
+    def open_file(self, download_id: str) -> bool:
+        """Open downloaded file"""
+        try:
+            with self._lock:
+                if download_id in self.active_downloads:
+                    download_info = self.active_downloads[download_id]
+                    if download_info['status'] == 'Completed':
+                        filepath = os.path.join(download_info['destination'], download_info['filename'])
+                        if os.path.exists(filepath):
+                            os.startfile(filepath)
+                            return True
+        except Exception:
+            pass
+        return False
+    
+    def remove(self, download_id: str) -> bool:
+        """Remove download from active list (UI only, not file deletion)"""
+        try:
+            with self._lock:
+                if download_id in self.active_downloads:
+                    del self.active_downloads[download_id]
+                    return True
+        except Exception:
+            pass
+        return False
+    
+    def clear_all(self) -> bool:
+        """Clear all completed downloads from UI list"""
+        try:
+            with self._lock:
+                completed_ids = [
+                    download_id for download_id, info in self.active_downloads.items()
+                    if info['status'] in ['Completed', 'Failed', 'Cancelled']
+                ]
+                for download_id in completed_ids:
+                    del self.active_downloads[download_id]
+                return True
+        except Exception:
+            pass
+        return False
+    
     def set_hf_token(self, token: str) -> bool:
         """Set Hugging Face token"""
         try:
