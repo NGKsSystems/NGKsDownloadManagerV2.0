@@ -89,12 +89,12 @@ Install-CoreDeps
 
 # Gate order is mandatory: V2.1 -> V2.9
 # V2.4 and V2.6 are legacy API mismatch and MUST run but MUST NOT block V3.1.
-Run-Test "V2.1" "& '$PY' tests\test_v21_acceptance.py" "v21_output.txt" $false
+Run-Test "V2.1" "& '$PY' test_v21_acceptance.py" "v21_output.txt" $false
 Run-Test "V2.4 (LEGACY)" "& '$PY' tests\test_v24_bandwidth.py" "v24_output.txt" $true
 Run-Test "V2.6 (LEGACY)" "& '$PY' tests\test_v26_queue.py" "v26_output.txt" $true
 Run-Test "V2.7" "& '$PY' tests\test_v27_persistence.py" "v27_output.txt" $false
 Run-Test "V2.8" "& '$PY' tests\test_v28_execution_policy.py" "v28_output.txt" $false
-Run-Test "V2.9" "& '$PY' tests\test_v29_event_bus.py" "v29_output.txt" $false
+Run-Test "V2.9" "& '$PY' tests\test_v29_ui_contract.py" "v29_output.txt" $false
 
 Write-Host "ALL REQUIRED GATES PASS (legacy gates executed and isolated)."
 exit 0
