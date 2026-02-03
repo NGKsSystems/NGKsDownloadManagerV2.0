@@ -11,3 +11,7 @@ __pycache__/
 *.bin
 *.pth
 *.pt
+
+# gate artifacts
+*_core_test.txt
+
