@@ -15,3 +15,6 @@ __pycache__/
 # gate artifacts
 *_core_test.txt
 
+
+data/
+
