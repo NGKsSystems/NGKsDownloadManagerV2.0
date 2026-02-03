@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 V2.6 Queue Tests - Deterministic queue behavior validation
+Reconciled to current architecture for V3.2 compatibility.
 Universal Agent Ruleset: ASCII-only, no placeholders, deterministic only
 """
 
@@ -25,6 +26,7 @@ class TestV26Queue:
         self.temp_dir = None
         self.server = None
         self.download_manager = None
+        self.queue_manager = None
         
     def setup(self):
         """Setup test environment"""
@@ -33,7 +35,13 @@ class TestV26Queue:
         base_url, serve_dir = self.server.start()
         self.base_url = base_url
         self.serve_dir = serve_dir
-        self.download_manager = DownloadManager(queue_enabled=True)
+        
+        # Set up queue manager with download manager
+        self.download_manager = DownloadManager()
+        self.queue_manager = QueueManager()
+        self.queue_manager.set_downloader(self.download_manager.download)
+        self.queue_manager.start_scheduler()
+        
         time.sleep(0.1)  # Server startup
     
     def add_test_file(self, filename, content):
@@ -47,8 +55,8 @@ class TestV26Queue:
         
     def teardown(self):
         """Cleanup test environment"""
-        if self.download_manager and self.download_manager.queue_manager:
-            self.download_manager.queue_manager.stop_scheduler()
+        if self.queue_manager:
+            self.queue_manager.stop_scheduler()
         if self.server:
             self.server.stop()
         if self.temp_dir and os.path.exists(self.temp_dir):
@@ -57,9 +65,6 @@ class TestV26Queue:
     def test_fifo_ordering(self):
         """Test A: FIFO ordering with same priority"""
         print("Running Test A: FIFO ordering (same priority)")
-        
-        # Create queue manager with max_active_downloads=1 for sequential processing
-        queue_mgr = QueueManager(max_active_downloads=1)
         
         # Create test files
         test_files = ['file1.txt', 'file2.txt', 'file3.txt']
@@ -80,24 +85,27 @@ class TestV26Queue:
             time.sleep(0.1)  # Simulate work
             return True
         
-        queue_mgr.set_downloader(mock_downloader)
-        queue_mgr.start_scheduler()
+        # Configure queue manager for sequential processing
+        self.queue_manager.stop_scheduler()  # Stop default scheduler
+        test_queue = QueueManager(max_active_downloads=1)
+        test_queue.set_downloader(mock_downloader)
+        test_queue.start_scheduler()
         
         # Enqueue all files with same priority (should maintain FIFO order)
         for i, url in enumerate(file_urls):
-            queue_mgr.enqueue(f"task{i}", url, os.path.join(self.temp_dir, test_files[i]), priority=5)
+            test_queue.enqueue(f"task{i}", url, os.path.join(self.temp_dir, test_files[i]), priority=5)
         
         # Wait for completion
         timeout = 5.0
         start_time = time.time()
         
         while time.time() - start_time < timeout:
-            status = queue_mgr.get_status()
+            status = test_queue.get_status()
             if status['state_counts']['COMPLETED'] == 3:
                 break
             time.sleep(0.1)
         
-        queue_mgr.stop_scheduler()
+        test_queue.stop_scheduler()
         
         # Verify FIFO order
         expected_order = ['file1.txt', 'file2.txt', 'file3.txt']
@@ -111,9 +119,6 @@ class TestV26Queue:
     def test_priority_ordering(self):
         """Test B: Priority ordering with different priorities"""
         print("Running Test B: Priority ordering (different priority)")
-        
-        # Create queue manager with max_active_downloads=1
-        queue_mgr = QueueManager(max_active_downloads=1)
         
         # Create test files
         test_files = ['low.txt', 'high.txt', 'medium.txt']
@@ -132,25 +137,27 @@ class TestV26Queue:
             time.sleep(0.1)
             return True
         
-        queue_mgr.set_downloader(mock_downloader)
-        queue_mgr.start_scheduler()
+        # Create test queue manager for priority testing
+        test_queue = QueueManager(max_active_downloads=1)
+        test_queue.set_downloader(mock_downloader)
+        test_queue.start_scheduler()
         
         # Enqueue with different priorities (higher number = higher priority)
-        queue_mgr.enqueue("task_low", file_urls[0], os.path.join(self.temp_dir, test_files[0]), priority=1)
-        queue_mgr.enqueue("task_high", file_urls[1], os.path.join(self.temp_dir, test_files[1]), priority=10)
-        queue_mgr.enqueue("task_med", file_urls[2], os.path.join(self.temp_dir, test_files[2]), priority=5)
+        test_queue.enqueue("task_low", file_urls[0], os.path.join(self.temp_dir, test_files[0]), priority=1)
+        test_queue.enqueue("task_high", file_urls[1], os.path.join(self.temp_dir, test_files[1]), priority=10)
+        test_queue.enqueue("task_med", file_urls[2], os.path.join(self.temp_dir, test_files[2]), priority=5)
         
         # Wait for completion
         timeout = 5.0
         start_time = time.time()
         
         while time.time() - start_time < timeout:
-            status = queue_mgr.get_status()
+            status = test_queue.get_status()
             if status['state_counts']['COMPLETED'] == 3:
                 break
             time.sleep(0.1)
         
-        queue_mgr.stop_scheduler()
+        test_queue.stop_scheduler()
         
         # Verify priority order: high (10), medium (5), low (1)
         expected_order = ['high.txt', 'medium.txt', 'low.txt']
@@ -164,9 +171,6 @@ class TestV26Queue:
     def test_concurrency_cap(self):
         """Test C: Concurrency cap with max_active_downloads=2"""
         print("Running Test C: Concurrency cap (max_active_downloads=2)")
-        
-        # Create queue manager with max_active_downloads=2
-        queue_mgr = QueueManager(max_active_downloads=2)
         
         # Create 5 test files
         test_files = [f'file{i}.txt' for i in range(1, 6)]
@@ -182,7 +186,7 @@ class TestV26Queue:
         
         def mock_downloader(url, destination, **kwargs):
             # Track active count during execution
-            current_active = len(queue_mgr.active_workers)
+            current_active = len(test_queue.active_workers)
             active_count_history.append(current_active)
             nonlocal max_concurrent
             max_concurrent = max(max_concurrent, current_active)
@@ -190,30 +194,32 @@ class TestV26Queue:
             time.sleep(0.2)  # Simulate work to ensure overlap
             return True
         
-        queue_mgr.set_downloader(mock_downloader)
-        queue_mgr.start_scheduler()
+        # Create test queue manager with max_active_downloads=2
+        test_queue = QueueManager(max_active_downloads=2)
+        test_queue.set_downloader(mock_downloader)
+        test_queue.start_scheduler()
         
         # Enqueue all 5 files
         for i, url in enumerate(file_urls):
-            queue_mgr.enqueue(f"task{i}", url, os.path.join(self.temp_dir, test_files[i]))
+            test_queue.enqueue(f"task{i}", url, os.path.join(self.temp_dir, test_files[i]))
         
         # Wait for completion
         timeout = 10.0
         start_time = time.time()
         
         while time.time() - start_time < timeout:
-            status = queue_mgr.get_status()
+            status = test_queue.get_status()
             current_active = status['active_downloads']
             if current_active > 2:
                 print(f"FAIL: Concurrency cap violated - {current_active} active downloads")
-                queue_mgr.stop_scheduler()
+                test_queue.stop_scheduler()
                 return False
                 
             if status['state_counts']['COMPLETED'] == 5:
                 break
             time.sleep(0.05)
         
-        queue_mgr.stop_scheduler()
+        test_queue.stop_scheduler()
         
         # Verify we never exceeded the limit
         if max_concurrent <= 2:
@@ -227,31 +233,25 @@ class TestV26Queue:
         """Test D: Pause/resume state transitions"""
         print("Running Test D: Pause/resume state transitions")
         
-        # Test state transitions directly without actual downloads
-        queue_mgr = QueueManager(max_active_downloads=1)
-        
-        from queue_manager import TaskState
-        from datetime import datetime
-        
         # Create a test task manually
         task_id = "pause_test"
         content = b"Test content for pause/resume test"
         url = self.add_test_file('pausetest.txt', content)
         dest_path = os.path.join(self.temp_dir, 'pausetest.txt')
         
-        queue_mgr.enqueue(task_id, url, dest_path)
+        self.queue_manager.enqueue(task_id, url, dest_path)
         
         # Test 1: Cannot pause PENDING task
-        task = queue_mgr.tasks[task_id]
+        task = self.queue_manager.tasks[task_id]
         task.state = TaskState.PENDING
-        paused = queue_mgr.pause_task(task_id)
+        paused = self.queue_manager.pause_task(task_id)
         if paused:
             print("FAIL: Should not be able to pause PENDING task")
             return False
         
         # Test 2: Can pause DOWNLOADING task
         task.state = TaskState.DOWNLOADING
-        paused = queue_mgr.pause_task(task_id)
+        paused = self.queue_manager.pause_task(task_id)
         if not paused:
             print("FAIL: Could not pause DOWNLOADING task")
             return False
@@ -262,7 +262,7 @@ class TestV26Queue:
             return False
         
         # Test 3: Can resume PAUSED task
-        resumed = queue_mgr.resume_task(task_id)
+        resumed = self.queue_manager.resume_task(task_id)
         if not resumed:
             print("FAIL: Could not resume PAUSED task")
             return False
@@ -278,8 +278,6 @@ class TestV26Queue:
     def test_cancel_semantics(self):
         """Test E: Cancel semantics - no completion fallback"""
         print("Running Test E: Cancel semantics")
-        
-        queue_mgr = QueueManager(max_active_downloads=1)
         
         # Create test file
         content = b"Test content for cancel test"
@@ -302,23 +300,25 @@ class TestV26Queue:
                 f.write(content)
             return True
         
-        queue_mgr.set_downloader(cancellable_downloader)
-        queue_mgr.start_scheduler()
+        # Create test queue manager for cancel testing
+        test_queue = QueueManager(max_active_downloads=1)
+        test_queue.set_downloader(cancellable_downloader)
+        test_queue.start_scheduler()
         
         # Enqueue download
         task_id = "cancel_test"
         dest_path = os.path.join(self.temp_dir, 'canceltest.txt')
-        queue_mgr.enqueue(task_id, url, dest_path)
+        test_queue.enqueue(task_id, url, dest_path)
         
         # Wait for download to start
         download_started.wait(timeout=2.0)
         time.sleep(0.1)  # Let it get to DOWNLOADING state
         
         # Cancel the task
-        cancelled = queue_mgr.cancel_task(task_id)
+        cancelled = test_queue.cancel_task(task_id)
         if not cancelled:
             print("FAIL: Could not cancel task")
-            queue_mgr.stop_scheduler()
+            test_queue.stop_scheduler()
             return False
         
         # Wait for cancellation to be processed
@@ -328,19 +328,19 @@ class TestV26Queue:
         time.sleep(0.2)
         
         # Verify final state is CANCELLED (not COMPLETED)
-        task = queue_mgr.tasks[task_id]
+        task = test_queue.tasks[task_id]
         if task.state == TaskState.CANCELLED:
             # Verify no file was created (no fallback completion)
             if not os.path.exists(dest_path):
                 print("PASS: Cancel semantics - task cancelled, no fallback completion")
-                queue_mgr.stop_scheduler()
+                test_queue.stop_scheduler()
                 return True
             else:
                 print("FAIL: File exists after cancel - fallback completion occurred")
         else:
             print(f"FAIL: Expected CANCELLED state, got {task.state}")
         
-        queue_mgr.stop_scheduler()
+        test_queue.stop_scheduler()
         return False
     
     def run_all_tests(self):

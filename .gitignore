@@ -28,3 +28,6 @@ acceptance_output.txt
 .history/
 downloads/
 logs/
+
+cache/
+config/
