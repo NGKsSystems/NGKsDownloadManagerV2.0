@@ -1,0 +1,19 @@
+﻿V2.7 Persistence Tests - Starting
+==================================================
+Running Test A: Save/Load round-trip schema validation
+PASS: Save/Load round-trip schema validation
+------------------------------
+Running Test B: Crash recovery transition test
+PASS: Crash recovery transition test
+------------------------------
+Running Test C: No duplicate task restore
+PASS: No duplicate task restore
+------------------------------
+Running Test D: Persistence with real download simulation
+PASS: Persistence with real download simulation
+------------------------------
+
+V2.7 Persistence Tests Complete: 4/4 passed
+OVERALL: PASS
+
+

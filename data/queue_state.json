@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "saved_at": "2026-02-03T08:47:10.649320",
+  "config_snapshot": {
+    "max_active_downloads": 2,
+    "persist_queue": true,
+    "persist_history": true
+  },
+  "tasks": [
+    {
+      "task_id": "unique1",
+      "url": "http://example.com/unique1",
+      "destination": "/tmp/unique1",
+      "priority": 5,
+      "state": "PENDING",
+      "created_at": "2026-02-03T08:47:10.644390",
+      "updated_at": "2026-02-03T08:47:10.644390",
+      "mode": "auto",
+      "connections_used": 1,
+      "error": null,
+      "progress": 0.0,
+      "speed_bps": 0.0,
+      "resume_state_path": null,
+      "history_id": null
+    },
+    {
+      "task_id": "unique2",
+      "url": "http://example.com/unique2",
+      "destination": "/tmp/unique2",
+      "priority": 5,
+      "state": "PENDING",
+      "created_at": "2026-02-03T08:47:10.646203",
+      "updated_at": "2026-02-03T08:47:10.646203",
+      "mode": "auto",
+      "connections_used": 1,
+      "error": null,
+      "progress": 0.0,
+      "speed_bps": 0.0,
+      "resume_state_path": null,
+      "history_id": null
+    },
+    {
+      "task_id": "unique3",
+      "url": "http://example.com/unique3",
+      "destination": "/tmp/unique3",
+      "priority": 5,
+      "state": "PENDING",
+      "created_at": "2026-02-03T08:47:10.649067",
+      "updated_at": "2026-02-03T08:47:10.649067",
+      "mode": "auto",
+      "connections_used": 1,
+      "error": null,
+      "progress": 0.0,
+      "speed_bps": 0.0,
+      "resume_state_path": null,
+      "history_id": null
+    }
+  ],
+  "scheduler_running": false
+}

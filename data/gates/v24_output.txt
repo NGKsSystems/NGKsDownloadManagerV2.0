@@ -1,0 +1,6 @@
+﻿
+Traceback (most recent call last):
+  File "C:\Users\suppo\Desktop\NGKsSystems\NGKs DL Manager V2.0\tests\test_v24_bandwidth.py", line 18, in <module>
+    from integrated_multi_downloader import IntegratedMultiDownloader, TokenBucketRateLimiter
+ImportError: cannot import name 'TokenBucketRateLimiter' from 'integrated_multi_downloader' (C:\Users\suppo\Desktop\NGKsSystems\NGKs DL Manager V2.0\integrated_multi_downloader.py)
+

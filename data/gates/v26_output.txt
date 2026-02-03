@@ -1,0 +1,14 @@
+﻿V2.6 Queue Tests - Starting
+==================================================
+
+Traceback (most recent call last):
+  File "C:\Users\suppo\Desktop\NGKsSystems\NGKs DL Manager V2.0\tests\test_v26_queue.py", line 391, in <module>
+    success = tester.run_all_tests()
+  File "C:\Users\suppo\Desktop\NGKsSystems\NGKs DL Manager V2.0\tests\test_v26_queue.py", line 352, in run_all_tests
+    self.setup()
+    ~~~~~~~~~~^^
+  File "C:\Users\suppo\Desktop\NGKsSystems\NGKs DL Manager V2.0\tests\test_v26_queue.py", line 36, in setup
+    self.download_manager = DownloadManager(queue_enabled=True)
+                            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+TypeError: DownloadManager.__init__() got an unexpected keyword argument 'queue_enabled'
+
