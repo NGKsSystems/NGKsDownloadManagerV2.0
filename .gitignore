@@ -25,3 +25,6 @@ data/
 *_core_test.txt
 v*_output.txt
 acceptance_output.txt
+.history/
+downloads/
+logs/
