@@ -12,12 +12,10 @@ __pycache__/
 *.pth
 *.pt
 
-# gate artifacts
+# V3.1 Gate runner artifacts and virtual environment
+.venv/
+data/
 *_core_test.txt
-
-
-data/
-
-
-data/
+acceptance_output.txt
+v*_output.txt
 
