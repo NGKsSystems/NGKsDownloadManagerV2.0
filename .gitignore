@@ -1,13 +1,27 @@
-# Ignore runtime and large artifacts
-downloads/
-logs/
-cache/
-.history/
+# ---- Python / virtualenv ----
+.venv/
+venv/
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+.pytest_cache/
+.coverage
+coverage.xml
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
 .vscode/
-*.mp4
-*.bin
-*.pth
-*.pt
+.idea/
+
+# ---- Project runtime / gate artifacts (MUST NOT BE TRACKED) ----
+data/
+*_core_test.txt
+v*_output.txt
+acceptance_output.txt
