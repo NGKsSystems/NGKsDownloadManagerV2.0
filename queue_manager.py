@@ -119,15 +119,36 @@ class QueueManager:
         self._last_progress_emit: Dict[str, float] = {}
         self._progress_throttle_interval = 0.5  # seconds
         
+    def _log_task(self, level: int, task_id: str, msg: str, **extra):
+        """Structured task logging with consistent format"""
+        import logging
+        logger = logging.getLogger("queue")
+        extra_str = " | ".join(f"{k}={v}" for k, v in extra.items()) if extra else ""
+        full_msg = f"TASK {task_id} | {msg}"
+        if extra_str:
+            full_msg += f" | {extra_str}"
+        logger.log(level, full_msg)
+        
+    def _log_scheduler(self, level: int, msg: str, **extra):
+        """Structured scheduler logging"""
+        import logging
+        logger = logging.getLogger("queue")
+        extra_str = " | ".join(f"{k}={v}" for k, v in extra.items()) if extra else ""
+        full_msg = f"SCHEDULER | {msg}"
+        if extra_str:
+            full_msg += f" | {extra_str}"
+        logger.log(level, full_msg)
+        
     def set_downloader(self, downloader_func: Callable):
         """Set the downloader function to use"""
         self.downloader_func = downloader_func
         
     def enqueue(self, task_id: str, url: str, destination: str, 
                priority: int = 5, mode: str = "auto", connections: int = 1) -> bool:
-        """Enqueue a download task"""
+        """Enqueue a download task with structured logging"""
         with self.lock:
             if task_id in self.tasks:
+                self._log_task(30, task_id, "DUPLICATE ENQUEUE REJECTED", priority=priority)  # WARNING
                 return False
                 
             now = datetime.now().isoformat()
@@ -155,6 +176,11 @@ class QueueManager:
             self.tasks[task_id] = task
             self.cancel_events[task_id] = threading.Event()
             
+            # Structured logging with key details
+            url_display = url[:50] + "..." if len(url) > 50 else url
+            self._log_task(20, task_id, "CREATED", priority=priority, url=url_display, 
+                          mode=mode, connections=connections, queue_size=len(self.tasks))  # INFO
+            
             # V2.9: Emit TASK_ADDED event
             self._emit_task_event("TASK_ADDED", task_id)
             
@@ -164,7 +190,7 @@ class QueueManager:
             return True
     
     def start_scheduler(self):
-        """Start the scheduler thread"""
+        """Start the scheduler thread with logging"""
         with self.lock:
             if not self.scheduler_running:
                 self.scheduler_running = True
@@ -172,6 +198,8 @@ class QueueManager:
                 self.scheduler_thread = threading.Thread(target=self._scheduler_loop)
                 self.scheduler_thread.daemon = True
                 self.scheduler_thread.start()
+                self._log_scheduler(20, "STARTED", max_active=self.max_active_downloads, 
+                                  retry_enabled=self.retry_enabled)  # INFO
     
     def stop_scheduler(self):
         """Stop the scheduler thread"""
@@ -187,7 +215,9 @@ class QueueManager:
             self.scheduler_thread.join(timeout=5.0)
     
     def _scheduler_loop(self):
-        """Main scheduler loop"""
+        """Main scheduler loop with decision visibility"""
+        self._log_scheduler(20, "LOOP_STARTED", thread=threading.current_thread().name)  # INFO
+        
         while self.scheduler_running and not self.stop_event.is_set():
             try:
                 self._process_queue()
@@ -197,22 +227,52 @@ class QueueManager:
                 time.sleep(1.0)
     
     def _process_queue(self):
-        """Process eligible tasks respecting concurrency and per-host limits"""
+        """Process eligible tasks with detailed decision logging"""
         with self.lock:
             # Clean up completed workers
             for task_id in list(self.active_workers.keys()):
                 if not self.active_workers[task_id].is_alive():
                     del self.active_workers[task_id]
             
+            # Get current state for logging
+            active_count = len(self.active_workers)
+            pending_tasks = [t for t in self.tasks.values() if t.state == TaskState.PENDING]
+            total_tasks = len(self.tasks)
+            
+            # ALWAYS log queue processing state for debugging (every 30 seconds)
+            current_time = time.time()
+            if not hasattr(self, '_last_debug_log') or current_time - self._last_debug_log > 30:
+                self._last_debug_log = current_time
+                all_task_states = {state.value: len([t for t in self.tasks.values() if t.state == state]) 
+                                 for state in TaskState}
+                self._log_scheduler(20, "DEBUG_QUEUE_STATE", active=active_count, pending=len(pending_tasks), 
+                                  total=total_tasks, max_active=self.max_active_downloads, 
+                                  states=str(all_task_states))  # INFO
+            
+            # Log queue processing state for debugging
+            if pending_tasks:
+                self._log_scheduler(20, "QUEUE_STATE", active=active_count, pending=len(pending_tasks), 
+                                  max_active=self.max_active_downloads)  # INFO
+            
             # Check global concurrency limit
-            if len(self.active_workers) >= self.max_active_downloads:
+            if active_count >= self.max_active_downloads:
+                if pending_tasks:  # Only log if there's work waiting
+                    self._log_scheduler(10, "MAX_ACTIVE_REACHED", active=active_count, 
+                                      waiting=len(pending_tasks), max_active=self.max_active_downloads)  # DEBUG
                 return
                 
             # Get eligible tasks (includes retry-wait timeout processing)
             eligible_tasks = self._get_eligible_tasks()
             
-            if not eligible_tasks:
+            if not eligible_tasks and pending_tasks:
+                self._log_scheduler(30, "NO_ELIGIBLE_TASKS", pending=len(pending_tasks))  # WARNING
                 return
+            elif not eligible_tasks:
+                return
+                
+            # Log scheduler decision making
+            self._log_scheduler(20, "PROCESSING", active=active_count, 
+                              pending=len(pending_tasks), eligible=len(eligible_tasks))  # INFO
                 
             # Find next task that can start (respecting per-host limits)
             for task in eligible_tasks:
@@ -222,7 +282,7 @@ class QueueManager:
                         break
     
     def _start_worker(self, task: QueueTask):
-        """Start a worker thread for a task"""
+        """Start a worker thread for a task with structured logging"""
         task.state = TaskState.STARTING
         task.updated_at = datetime.now().isoformat()
         task.attempt += 1  # V2.8: Increment attempt counter
@@ -230,6 +290,12 @@ class QueueManager:
         worker = threading.Thread(target=self._worker_thread, args=(task.task_id,))
         worker.daemon = True
         self.active_workers[task.task_id] = worker
+        
+        # Log task start with context
+        self._log_task(20, task.task_id, "STARTED", priority=task.priority, 
+                      attempt=task.attempt, worker=worker.name, 
+                      active_count=len(self.active_workers))  # INFO
+        
         worker.start()
     
     def _worker_thread(self, task_id: str):
@@ -247,33 +313,79 @@ class QueueManager:
                 raise RuntimeError("No downloader function set")
             
             # Create progress callback
-            def progress_callback(filename, progress, speed, status):
+            def progress_callback(progress_info):
                 with self.lock:
-                    if task_id in self.tasks:
-                        self.tasks[task_id].progress = progress
-                        self.tasks[task_id].speed_bps = speed
+                    if task_id in self.tasks and isinstance(progress_info, dict):
+                        # Extract progress percentage
+                        progress_str = progress_info.get('progress', '0%')
+                        if isinstance(progress_str, str) and progress_str.endswith('%'):
+                            try:
+                                progress_val = float(progress_str.replace('%', ''))
+                            except ValueError:
+                                progress_val = 0.0
+                        else:
+                            progress_val = 0.0
+                        
+                        self.tasks[task_id].progress = progress_val
+                        
+                        # Parse speed string to bytes/sec
+                        speed_str = progress_info.get('speed', '0 B/s')
+                        speed_bps = 0.0
+                        if isinstance(speed_str, str):
+                            try:
+                                # Parse speeds like "1.5 MB/s", "500 KB/s", "1024 B/s"
+                                speed_parts = speed_str.replace('B/s', '').strip().split()
+                                if len(speed_parts) >= 2:
+                                    value = float(speed_parts[0])
+                                    unit = speed_parts[1].upper()
+                                    if unit == 'MB':
+                                        speed_bps = value * 1024 * 1024
+                                    elif unit == 'KB':
+                                        speed_bps = value * 1024
+                                    else:  # Assume bytes
+                                        speed_bps = value
+                                elif len(speed_parts) == 1:
+                                    speed_bps = float(speed_parts[0])  # Just a number
+                            except (ValueError, IndexError):
+                                speed_bps = 0.0
+                        
+                        self.tasks[task_id].speed_bps = speed_bps
                         self.tasks[task_id].updated_at = datetime.now().isoformat()
             
             # Execute download
-            success = self.downloader_func(
-                task.url,
-                task.destination,
-                max_connections=task.connections_used,
-                mode=task.mode,
-                progress_callback=progress_callback,
-                cancel_event=cancel_event
-            )
+            try:
+                success = self.downloader_func(
+                    task_id,
+                    task.url,
+                    task.destination,
+                    progress_callback=progress_callback,
+                    max_connections=task.connections_used,
+                    mode=task.mode,
+                    cancel_event=cancel_event
+                )
+                self._log_task(20, task_id, "DOWNLOAD_COMPLETE", success=success)  # INFO
+            except Exception as download_error:
+                success = False
+                self._log_task(40, task_id, "DOWNLOAD_ERROR", error=str(download_error))  # ERROR
             
             # Update final state with V2.8 retry logic
             with self.lock:
+                start_time = datetime.fromisoformat(task.created_at) if hasattr(task, 'created_at') else datetime.now()
+                duration = (datetime.now() - start_time).total_seconds()
+                
                 if cancel_event.is_set():
                     task.state = TaskState.CANCELLED
+                    self._log_task(30, task_id, "CANCELLED", duration=f"{duration:.2f}s")  # WARNING
                 elif success:
                     task.state = TaskState.COMPLETED
                     task.progress = 100.0
+                    self._log_task(20, task_id, "COMPLETED", duration=f"{duration:.2f}s", 
+                                  progress="100%")  # INFO
                 else:
                     # Handle failure with retry logic
                     self._handle_task_failure(task, "Download failed")
+                    self._log_task(40, task_id, "FAILED", duration=f"{duration:.2f}s", 
+                                  error="Download failed")  # ERROR
                 
                 task.updated_at = datetime.now().isoformat()
                 
@@ -292,8 +404,13 @@ class QueueManager:
         except Exception as e:
             with self.lock:
                 task = self.tasks[task_id]
+                start_time = datetime.fromisoformat(task.created_at) if hasattr(task, 'created_at') else datetime.now()
+                duration = (datetime.now() - start_time).total_seconds()
+                
                 # Handle exception with retry logic
                 self._handle_task_failure(task, str(e))
+                self._log_task(40, task_id, "EXCEPTION", duration=f"{duration:.2f}s", 
+                              error=str(e)[:100])  # ERROR - truncate long errors
                 task.updated_at = datetime.now().isoformat()
                 
                 # Only add to history if in terminal state

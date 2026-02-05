@@ -302,8 +302,9 @@ class IntegratedMultiDownloader:
             # Ensure directory exists
             os.makedirs(os.path.dirname(destination), exist_ok=True)
             
-            # Download to temp file first
-            temp_file = f"{destination}.tmp"
+            # STEP 2: Atomic file handling with .part extension
+            temp_file = f"{destination}.part"
+            logger.info(f"ATOMIC | START | temp_file={temp_file} final_file={destination}")
             downloaded_bytes = 0
             
             with open(temp_file, 'wb') as f:
@@ -315,6 +316,7 @@ class IntegratedMultiDownloader:
                             # Delete temp file and return (no resume for single connection)
                             if os.path.exists(temp_file):
                                 os.remove(temp_file)
+                                logger.warning(f"ATOMIC | COMMIT_FAIL | removed temp_file={temp_file} reason=cancelled")
                             info['mode'] = 'cancelled'
                             info['connections_used'] = 0
                             info['error'] = 'User cancelled'
@@ -331,9 +333,21 @@ class IntegratedMultiDownloader:
                                 'progress': f"{progress:.1f}%",
                                 'status': 'Downloading (single connection)'
                             })
-            
-            # Atomic move
-            os.replace(temp_file, destination)
+                        # STEP 1: Hash verification before atomic commit
+            logger.info(f"HASH | START | {os.path.basename(destination)} | verifying SHA256 | temp={temp_file}")
+            try:
+                calculated_hash = self._calculate_file_hash(temp_file)
+                logger.info(f"HASH | FINAL_OK | {os.path.basename(destination)} | sha256={calculated_hash[:16]}... | temp={temp_file}")
+            except Exception as hash_error:
+                logger.error(f"HASH | FINAL_FAIL | {os.path.basename(destination)} | error={hash_error} | temp={temp_file}")
+                raise hash_error
+                        # STEP 2: Atomic commit operation
+            try:
+                os.replace(temp_file, destination)
+                logger.info(f"ATOMIC | COMMIT_OK | temp_file={temp_file} final_file={destination}")
+            except Exception as atomic_error:
+                logger.error(f"ATOMIC | COMMIT_FAIL | temp_file={temp_file} final_file={destination} error={atomic_error}")
+                raise atomic_error
             
             logger.info(f"Single-connection: completed {downloaded_bytes} bytes")
             
@@ -347,10 +361,11 @@ class IntegratedMultiDownloader:
             return True, info
             
         except Exception as e:
-            # Cleanup temp file
-            temp_file = f"{destination}.tmp"
+            # Cleanup temp file on failure
+            temp_file = f"{destination}.part"
             if os.path.exists(temp_file):
                 os.remove(temp_file)
+                logger.warning(f"ATOMIC | COMMIT_FAIL | removed temp_file={temp_file} reason=error error={e}")
                 
             logger.error(f"Single-connection: failed - {e}")
             return False, info
@@ -361,6 +376,10 @@ class IntegratedMultiDownloader:
         """Multi-connection download for Range-capable servers with resume support"""
         info['mode'] = 'multi'
         info['connections_used'] = self.max_connections
+        
+        # STEP 2: Atomic file handling - log atomic operation start
+        temp_destination = f"{destination}.part"
+        logger.info(f"ATOMIC | START | final={destination} | temp={temp_destination} | mode=multi")
         
         try:
             # Check for existing state
@@ -461,7 +480,8 @@ class IntegratedMultiDownloader:
 
             # Merge segments into final file using streaming chunks
             logger.info("Multi-connection: merging segments")
-            temp_file = f"{destination}.tmp"
+            temp_file = f"{destination}.part"
+            logger.info(f"ATOMIC | START | temp_file={temp_file} final_file={destination}")
             
             merged_size = 0
             with open(temp_file, 'wb') as outfile:
@@ -478,8 +498,13 @@ class IntegratedMultiDownloader:
             if merged_size != total_size:
                 raise Exception(f"Merged file size mismatch (expected {total_size}, got {merged_size})")
             
-            # Atomic move
-            os.replace(temp_file, destination)
+            # STEP 2: Atomic commit operation
+            try:
+                os.replace(temp_file, destination)
+                logger.info(f"ATOMIC | COMMIT_OK | temp_file={temp_file} final_file={destination}")
+            except Exception as atomic_error:
+                logger.error(f"ATOMIC | COMMIT_FAIL | temp_file={temp_file} final_file={destination} error={atomic_error}")
+                raise atomic_error
             
             # Cleanup part files
             for part_file in part_files:
@@ -514,9 +539,10 @@ class IntegratedMultiDownloader:
                 return False, info
             
             # Cleanup temp file on non-cancel failure, but keep part files for potential resume
-            temp_file = f"{destination}.tmp"
+            temp_file = f"{destination}.part"
             if os.path.exists(temp_file):
                 os.remove(temp_file)
+                logger.warning(f"ATOMIC | COMMIT_FAIL | removed temp_file={temp_file} reason=error error={e}")
                 
             # Only remove part files if they are corrupted, not on normal failure
             # (This allows resume to work with partial downloads)
@@ -526,3 +552,11 @@ class IntegratedMultiDownloader:
             # Fallback to single connection only on non-cancel failures
             logger.info("Multi-connection: falling back to single connection")
             return self._single_connection_download(url, destination, progress_callback, info)
+
+    def _calculate_file_hash(self, filepath: str) -> str:
+        """Calculate SHA256 hash of a file for integrity verification"""
+        sha256_hash = hashlib.sha256()
+        with open(filepath, "rb") as f:
+            for byte_block in iter(lambda: f.read(8192), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()

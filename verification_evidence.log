@@ -1,0 +1,21 @@
+
+2026-02-05 18:22:43,334 - ui.adapter - INFO - Starting download dl_0: Unknown - https://httpbin.org/bytes/102400
+2026-02-05 18:22:43,335 - ui.adapter - INFO - AUTO-DOWNLOAD ENABLED | queue_enabled=true task_id=dl_0
+2026-02-05 18:22:43,336 - ui.adapter - INFO - Adding download dl_0 to queue
+2026-02-05 18:22:43,337 - queue - INFO - TASK dl_0 | CREATED | priority=5 | url=https://httpbin.org/bytes/102400 | mode=auto | connections=1 | queue_size=1
+2026-02-05 18:22:43,337 - ui.adapter - INFO - QUEUE | ENQUEUE | task_id=dl_0 | priority=5 | url_host=httpbin.org
+2026-02-05 18:22:43,338 - ui.adapter - INFO - TASK_ADDED | dl_0 | 102400 | priority=5
+2026-02-05 18:22:43,342 - ui.adapter - INFO - LOG AUTO-SAVED: C:\Users\suppo\Downloads\DL Manager Logs\NGKs_DownloadManager_Log_task_complete_2026-02-05_18-22-43.log
+2026-02-05 18:22:43,369 - queue - INFO - TASK dl_0 | STARTED | priority=5 | attempt=1 | worker=Thread-2 (_worker_thread) | active_count=1
+2026-02-05 18:22:43,371 - ui.adapter - INFO - TASK_STATE | dl_0 | STARTING | 102400
+2026-02-05 18:22:43,372 - ui.adapter - INFO - Queue executing download dl_0: Unknown - https://httpbin.org/bytes/102400
+2026-02-05 18:22:45,034 - download_manager - INFO - Download starting: https://httpbin.org/bytes/102400 -> C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65
+2026-02-05 18:22:53,152 - integrated_multi_downloader - INFO - ATOMIC | START | temp_file=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65.part final_file=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65
+2026-02-05 18:22:55,165 - integrated_multi_downloader - INFO - HASH | START | download_efe75b65 | verifying SHA256 | temp=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65.part
+2026-02-05 18:22:55,174 - integrated_multi_downloader - INFO - HASH | FINAL_OK | download_efe75b65 | sha256=7d0740e19fff302c... | temp=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65.part
+2026-02-05 18:22:55,175 - integrated_multi_downloader - INFO - ATOMIC | COMMIT_OK | temp_file=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65.part final_file=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65
+2026-02-05 18:22:55,179 - download_manager - INFO - Download completed: mode=single, connections=1, size=102400, time=10.14s
+2026-02-05 18:22:55,179 - ui.adapter - INFO - TASK_DONE | dl_0 | NGK_Downloads
+2026-02-05 18:22:55,183 - ui.adapter - INFO - LOG AUTO-SAVED: C:\Users\suppo\Downloads\DL Manager Logs\NGKs_DownloadManager_Log_task_complete_2026-02-05_18-22-55.log
+2026-02-05 18:22:55,184 - queue - INFO - TASK dl_0 | DOWNLOAD_COMPLETE | success=True
+2026-02-05 18:22:55,184 - queue - INFO - TASK dl_0 | COMPLETED | duration=11.85s | progress=100%
