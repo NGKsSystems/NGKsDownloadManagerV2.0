@@ -17,6 +17,8 @@ from datetime import datetime
 # Engine imports (adapter only layer touches these)
 from download_manager import DownloadManager
 from youtube_downloader import YouTubeDownloader
+# PHASE 9: Import unified download executor for all download types
+from unified_executor import UnifiedDownloadExecutor, UnifiedQueueTask
 # HuggingFace import moved to lazy loading
 from utils import URLDetector, ConfigManager, HistoryManager
 from event_bus import EventBus
@@ -41,6 +43,16 @@ class UIAdapter:
         # Core engine components
         self.download_manager = DownloadManager()
         self.youtube_downloader = YouTubeDownloader()
+        
+        # PHASE 9: Initialize unified download executor for all download types
+        dm_config = {
+            'max_chunk_size': 8192,
+            'max_retries': 3,
+            'enable_multi_connection': True,
+            'max_connections': 4,
+            'debug_logging': False
+        }
+        self.unified_executor = UnifiedDownloadExecutor(dm_config)
         
         # Lazy HuggingFace downloader (graceful degradation if deps missing)
         self.hf_downloader = None
@@ -156,79 +168,80 @@ class UIAdapter:
     
     def _queue_downloader_wrapper(self, task_id: str, url: str, destination: str, 
                                 progress_callback, **options):
-        """Wrapper function for QueueManager to call our download methods"""            
+        """
+        PHASE 9: Unified downloader wrapper using UnifiedDownloadExecutor
+        Preserves ENGINE BASELINE v2.0 compatibility while supporting all download types
+        """            
         try:
-            # Detect URL type  
-            url_type = self.url_detector.detect_url_type(url)
+            # Phase 10.4: Merge type-specific options from queue task
+            combined_options = options.copy()
+            if hasattr(self, 'queue_manager') and self.queue_manager and task_id in self.queue_manager.tasks:
+                queue_task = self.queue_manager.tasks[task_id]
+                if hasattr(queue_task, 'type_options') and queue_task.type_options:
+                    combined_options.update(queue_task.type_options)
+            
+            # PHASE 9: Create unified task with auto-detected download type and full options
+            task = self.unified_executor.create_task_for_url(
+                task_id=task_id,
+                url=url,
+                destination=destination,
+                priority=combined_options.get('priority', 5),
+                **{k: v for k, v in combined_options.items() if k != 'priority'}
+            )
+            
+            # Update task state in QueueManager for ENGINE BASELINE v2.0 compatibility
+            with self._lock:
+                if hasattr(self, 'queue_manager') and self.queue_manager and task_id in self.queue_manager.tasks:
+                    queue_task = self.queue_manager.tasks[task_id]
+                    # Copy unified task properties to queue task
+                    queue_task.download_type = task.download_type
+                    queue_task.download_options = task.download_options
+            
             filename = url.split('/')[-1][:20] if '/' in url else "unknown"
             
             self.logger.info(f"TASK_STATE | {task_id} | STARTING | {filename}")
-            self.logger.info(f"Queue executing download {task_id}: {url_type} - {url}")
+            self.logger.info(f"UNIFIED_EXEC | {task_id} | type={task.download_type} | {url}")
             
             # Store in active downloads for UI tracking
             with self._lock:
                 self.active_downloads[task_id] = {
                     'url': url,
-                    'url_type': url_type,
+                    'url_type': task.download_type.title(),  # Convert to display format
                     'destination': destination, 
                     'filename': 'Preparing...',
                     'progress': 0.0,
                     'speed': '0 B/s',
                     'status': 'Starting',
                     'options': options,
-                    'start_time': time.time()
+                    'start_time': time.time(),
+                    'download_type': task.download_type  # Store for forensics
                 }
             
-            # Execute download with the appropriate engine
-            if url_type in ["YouTube", "Twitter", "Instagram", "TikTok"]:
-                result = self.youtube_downloader.download(
-                    url, destination, progress_callback,
-                    extract_audio=options.get('extract_audio', False),
-                    auto_quality=options.get('auto_quality', True)
-                )
-            elif url_type == "Hugging Face":
-                if not self.hf_downloader:
-                    raise ValueError("HuggingFace support disabled: missing dependencies")
-                hf_token = self.settings.get('hf_token', '')
-                result = self.hf_downloader.download(
-                    url, destination, progress_callback, token=hf_token
-                )
-            else:
-                try:
-                    download_result = self.download_manager.download(
-                        url, destination, progress_callback, task_id=task_id
-                    )
-                    # Handle possible None return or tuple return
-                    if download_result is None:
-                        success, info = False, {'error': 'Download method returned None'}
-                    elif isinstance(download_result, tuple) and len(download_result) == 2:
-                        success, info = download_result
-                    else:
-                        # Handle legacy single value return
-                        success = bool(download_result)
-                        info = {'mode': 'unknown', 'connections_used': 1, 'total_size': 0, 'download_time': 0}
-                    
-                    # Convert tuple result to expected dictionary format
-                    if success:
-                        result = {
-                            'status': 'success',
-                            'filename': os.path.basename(destination),
-                            'info': info
-                        }
-                    else:
-                        result = {
-                            'status': 'failed',
-                            'filename': os.path.basename(destination),
-                            'error': info.get('error', 'Download failed'),
-                            'info': info
-                        }
-                except Exception as download_error:
-                    result = {
-                        'status': 'failed',
-                        'filename': os.path.basename(destination),
-                        'error': f'Download exception: {str(download_error)}',
-                        'info': {'error': str(download_error)}
+            # Execute using unified executor
+            success = self.unified_executor.execute_download(task, progress_callback)
+            
+            # Convert to expected result format for ENGINE BASELINE v2.0 compatibility
+            if success:
+                result = {
+                    'status': 'success',
+                    'filename': os.path.basename(destination),
+                    'info': {
+                        'mode': task.download_type,
+                        'connections_used': getattr(task, 'connections_used', 1),
+                        'total_size': 0,  # Will be updated by progress callback
+                        'download_time': 0
                     }
+                }
+            else:
+                result = {
+                    'status': 'failed',
+                    'filename': os.path.basename(destination),
+                    'error': task.error or 'Unknown download error',
+                    'info': {
+                        'mode': task.download_type,
+                        'error': task.error
+                    }
+                }
             
             # Update final status and add to history
             if result and result.get('status') == 'success':
@@ -400,7 +413,9 @@ class UIAdapter:
                         destination=destination,
                         priority=priority,
                         mode=options.get('mode', 'auto'),
-                        connections=options.get('connections', 1)
+                        connections=options.get('connections', 1),
+                        # Phase 10.4: Pass through all type-specific options
+                        **{k: v for k, v in options.items() if k not in ['priority', 'mode', 'connections']}
                     )
                     
                     if success:

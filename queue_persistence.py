@@ -65,7 +65,9 @@ def save_queue_state(queue_manager, path: str) -> None:
                 "next_eligible_at": task.next_eligible_at,
                 "last_error": task.last_error,
                 "host": task.host,
-                "effective_priority": task.effective_priority
+                "effective_priority": task.effective_priority,
+                # Phase 10.4: Type-specific options for unified pipeline  
+                "type_options": getattr(task, 'type_options', {})
             }
             tasks_list.append(task_data)
         

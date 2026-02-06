@@ -87,7 +87,7 @@ def setup_ui_logging():
     sys.stderr = _StreamToLogger(logger, logging.ERROR)
     
     logger.info("=" * 60)
-    logger.info("NGK'S DOWNLOAD MANAGER V4.0 UI STARTED")
+    logger.info("NGK'S DOWNLOAD MANAGER V2.0 UI STARTED")
     logger.info("=" * 60)
     
     return logger
@@ -134,7 +134,7 @@ def main():
         # Create Qt application
         app = QApplication(sys.argv)
         app.setApplicationName("NGK's Download Manager")
-        app.setApplicationVersion("4.0")
+        app.setApplicationVersion("2.0")
         app.setOrganizationName("NGK Systems")
         
         # Set Fusion style for modern look

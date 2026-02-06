@@ -63,6 +63,13 @@ class QueueTask:
     # V2.8 fairness fields
     host: Optional[str] = None
     effective_priority: int = 5
+    # Phase 10.4: Type-specific options for unified pipeline
+    type_options: Dict[str, Any] = None
+    
+    def __post_init__(self):
+        """Initialize default values after dataclass creation"""
+        if self.type_options is None:
+            self.type_options = {}
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -178,7 +185,9 @@ class QueueManager:
                     next_eligible_at=task_data.get("next_eligible_at"),
                     last_error=task_data.get("last_error"),
                     host=task_data.get("host"),
-                    effective_priority=task_data.get("effective_priority", task_data["priority"])
+                    effective_priority=task_data.get("effective_priority", task_data["priority"]),
+                    # Phase 10.4: Type-specific options for unified pipeline
+                    type_options=task_data.get("type_options", {})
                 )
                 
                 self.tasks[task.task_id] = task
@@ -234,8 +243,8 @@ class QueueManager:
         self.downloader_func = downloader_func
         
     def enqueue(self, task_id: str, url: str, destination: str, 
-               priority: int = 5, mode: str = "auto", connections: int = 1) -> bool:
-        """Enqueue a download task with structured logging and policy gates"""
+               priority: int = 5, mode: str = "auto", connections: int = 1, **type_options) -> bool:
+        """Enqueue a download task with structured logging, policy gates, and type-specific options (Phase 10.4)"""
         with self.lock:
             if task_id in self.tasks:
                 self._log_task(30, task_id, "DUPLICATE ENQUEUE REJECTED", priority=priority)  # WARNING
@@ -276,7 +285,9 @@ class QueueManager:
                 attempt=0,
                 max_attempts=self.retry_max_attempts,
                 host=host,
-                effective_priority=priority
+                effective_priority=priority,
+                # Phase 10.4: Store type-specific options for unified pipeline
+                type_options=type_options
             )
             
             self.tasks[task_id] = task

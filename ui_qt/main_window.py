@@ -117,8 +117,76 @@ class DownloadsTab(QWidget):
         dest_hlayout.addWidget(self.dest_entry)
         dest_hlayout.addWidget(self.browse_btn)
         
-        dest_layout.addRow("Destination:", dest_widget)
+        dest_layout.addRow("Destination:", dest_widget)  
         dest_group.setLayout(dest_layout)
+        
+        # Type-specific options group (Phase 10.4)
+        self.options_group = QGroupBox("Download Type Options")
+        self.options_group.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        self.options_group.setVisible(False)  # Hidden by default
+        options_layout = QVBoxLayout()
+        
+        # YouTube options
+        self.youtube_options = QWidget()
+        youtube_layout = QFormLayout(self.youtube_options)
+        
+        self.extract_audio_checkbox = QCheckBox("Extract audio only")
+        self.quality_combo = QComboBox()
+        self.quality_combo.addItems(["best", "1080", "720", "480", "360", "240"])
+        self.quality_combo.setCurrentText("best")
+        
+        youtube_layout.addRow("Quality:", self.quality_combo)
+        youtube_layout.addRow("", self.extract_audio_checkbox)
+        self.youtube_options.setVisible(False)
+        
+        # HuggingFace options  
+        self.huggingface_options = QWidget()
+        huggingface_layout = QFormLayout(self.huggingface_options)
+        
+        self.hf_token_entry = QLineEdit()
+        self.hf_token_entry.setPlaceholderText("HuggingFace token (optional)")
+        self.hf_token_entry.setEchoMode(QLineEdit.EchoMode.Password)
+        
+        huggingface_layout.addRow("Token:", self.hf_token_entry)
+        self.huggingface_options.setVisible(False)
+        
+        # Protocol options
+        self.protocol_options = QWidget()
+        protocol_layout = QFormLayout(self.protocol_options)
+        
+        self.username_entry = QLineEdit()
+        self.username_entry.setPlaceholderText("Username (if required)")
+        self.password_entry = QLineEdit()
+        self.password_entry.setPlaceholderText("Password (if required)")
+        self.password_entry.setEchoMode(QLineEdit.EchoMode.Password)
+        
+        protocol_layout.addRow("Username:", self.username_entry)
+        protocol_layout.addRow("Password:", self.password_entry)
+        self.protocol_options.setVisible(False)
+        
+        # HTTP options
+        self.http_options = QWidget()
+        http_layout = QFormLayout(self.http_options)
+        
+        self.connections_spin = QSpinBox()
+        self.connections_spin.setMinimum(1)
+        self.connections_spin.setMaximum(8)
+        self.connections_spin.setValue(4)
+        
+        self.chunk_size_combo = QComboBox()
+        self.chunk_size_combo.addItems(["4KB", "8KB", "16KB", "32KB", "64KB"])
+        self.chunk_size_combo.setCurrentText("8KB")
+        
+        http_layout.addRow("Connections:", self.connections_spin)
+        http_layout.addRow("Chunk Size:", self.chunk_size_combo)
+        self.http_options.setVisible(False)
+        
+        # Add all option widgets to layout
+        options_layout.addWidget(self.youtube_options)
+        options_layout.addWidget(self.huggingface_options)
+        options_layout.addWidget(self.protocol_options)
+        options_layout.addWidget(self.http_options)
+        self.options_group.setLayout(options_layout)
         
         # Action buttons
         button_layout = QHBoxLayout()
@@ -220,6 +288,7 @@ class DownloadsTab(QWidget):
         # Add all groups to main layout
         layout.addWidget(url_group)
         layout.addWidget(dest_group)
+        layout.addWidget(self.options_group)  # Phase 10.4: Add options group
         layout.addLayout(button_layout)
         layout.addWidget(progress_group)
         
@@ -227,17 +296,49 @@ class DownloadsTab(QWidget):
         self.load_default_destination()
     
     def on_url_changed(self, text):
-        """Handle URL input change - validate via adapter"""
+        """Handle URL input change - validate via adapter and show type options (Phase 10.4)"""
         if text.strip():
             result = self.adapter.validate_url(text.strip())
             if result['valid']:
-                self.url_info_label.setText(f"Detected: {result['type']}")
+                url_type = result['type']
+                self.url_info_label.setText(f"Detected: {url_type}")
                 self.url_info_label.setStyleSheet("color: #107c10; font-style: italic;")
+                
+                # Phase 10.4: Show appropriate type-specific options
+                self._update_options_visibility(url_type)
+                
             else:
                 self.url_info_label.setText(f"Invalid: {result.get('error', 'Unknown error')}")
                 self.url_info_label.setStyleSheet("color: #d13438; font-style: italic;")
+                self._hide_all_options()
         else:
             self.url_info_label.setText("")
+            self._hide_all_options()
+    
+    def _update_options_visibility(self, url_type):
+        """Show appropriate options based on detected URL type (Phase 10.4)"""
+        # Hide all options first
+        self._hide_all_options()
+        
+        # Show options group and specific type options
+        self.options_group.setVisible(True)
+        
+        if url_type == "youtube":
+            self.youtube_options.setVisible(True)
+        elif url_type == "huggingface": 
+            self.huggingface_options.setVisible(True)
+        elif url_type == "protocol":
+            self.protocol_options.setVisible(True)
+        elif url_type == "http":
+            self.http_options.setVisible(True)
+    
+    def _hide_all_options(self):
+        """Hide all type-specific options (Phase 10.4)"""
+        self.options_group.setVisible(False)
+        self.youtube_options.setVisible(False)
+        self.huggingface_options.setVisible(False)
+        self.protocol_options.setVisible(False)
+        self.http_options.setVisible(False)
     
     def paste_url(self):
         """Paste URL from clipboard"""
@@ -317,7 +418,7 @@ class DownloadsTab(QWidget):
             self.dest_entry.setText(directory)
     
     def start_download(self):
-        """Start download via adapter"""
+        """Start download via adapter with unified pipeline integration (Phase 10.4)"""
         url = self.url_entry.text().strip()
         destination = self.dest_entry.text().strip()
         
@@ -329,10 +430,43 @@ class DownloadsTab(QWidget):
             QMessageBox.warning(self, "Warning", "Please select a destination directory")
             return
         
+        # Phase 10.4: Gather type-specific options based on detected URL type
+        options = {}
+        result = self.adapter.validate_url(url)
+        
+        if result.get('valid', False):
+            url_type = result['type']
+            
+            if url_type == "youtube" and self.youtube_options.isVisible():
+                options['extract_audio'] = self.extract_audio_checkbox.isChecked()
+                options['quality'] = self.quality_combo.currentText()
+                options['auto_quality'] = self.quality_combo.currentText() == "best"
+                
+            elif url_type == "huggingface" and self.huggingface_options.isVisible():
+                token = self.hf_token_entry.text().strip()
+                if token:
+                    options['token'] = token
+                    
+            elif url_type == "protocol" and self.protocol_options.isVisible():
+                username = self.username_entry.text().strip()
+                password = self.password_entry.text().strip()
+                if username:
+                    options['username'] = username
+                if password:
+                    options['password'] = password
+                    
+            elif url_type == "http" and self.http_options.isVisible():
+                options['connections'] = self.connections_spin.value()
+                chunk_text = self.chunk_size_combo.currentText()
+                chunk_kb = int(chunk_text.replace('KB', ''))
+                options['max_chunk_size'] = chunk_kb * 1024
+        
         try:
-            download_id = self.adapter.start_download(url, destination)
+            # Use unified pipeline via adapter with type-specific options
+            download_id = self.adapter.start_download(url, destination, options)
             if download_id:
                 self.url_entry.clear()  # Clear URL after starting
+                self._hide_all_options()  # Hide options after successful start
             else:
                 QMessageBox.critical(self, "Error", "Failed to start download: No download ID returned")
         except Exception as e:
@@ -1040,7 +1174,7 @@ class MainWindow(QMainWindow):
         self.event_manager = get_event_manager()
         
         # Setup window
-        self.setWindowTitle("NGK's Download Manager V4.0")
+        self.setWindowTitle("NGK's Download Manager V2.0")
         self.setMinimumSize(800, 600)
         self.resize(1000, 700)
         
@@ -1144,7 +1278,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.tab_widget)
         
         # Status bar
-        self.statusBar().showMessage("Ready - NGK's Download Manager V4.0")
+        self.statusBar().showMessage("Ready - NGK's Download Manager V2.0")
         self.statusBar().setFont(QFont("Segoe UI", 9))
     
     def setup_events(self):
