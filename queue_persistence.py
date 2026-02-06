@@ -58,7 +58,14 @@ def save_queue_state(queue_manager, path: str) -> None:
                 "progress": task.progress,
                 "speed_bps": task.speed_bps,
                 "resume_state_path": task.resume_state_path,
-                "history_id": task.history_id
+                "history_id": task.history_id,
+                # V2.8 retry fields
+                "attempt": task.attempt,
+                "max_attempts": task.max_attempts,
+                "next_eligible_at": task.next_eligible_at,
+                "last_error": task.last_error,
+                "host": task.host,
+                "effective_priority": task.effective_priority
             }
             tasks_list.append(task_data)
         

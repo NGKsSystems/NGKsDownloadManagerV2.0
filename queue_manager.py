@@ -119,6 +119,88 @@ class QueueManager:
         self._last_progress_emit: Dict[str, float] = {}
         self._progress_throttle_interval = 0.5  # seconds
         
+        # Load persisted state if enabled
+        if self.persist_queue:
+            self._load_persisted_state_on_startup()
+        
+    def _load_persisted_state_on_startup(self):
+        """Load persisted state during queue manager initialization with recovery"""
+        if not os.path.exists(self.queue_state_path):
+            import logging
+            logger = logging.getLogger("queue")
+            logger.info(f"QUEUEPERSIST | LOAD_OK | tasks=0 | path={self.queue_state_path} | reason=no_state_file")
+            return
+            
+        try:
+            from queue_persistence import load_queue_state, apply_crash_recovery_rules, PersistenceError
+            
+            # Load state from disk
+            state = load_queue_state(self.queue_state_path)
+            
+            # Apply crash recovery rules
+            recovered_state = apply_crash_recovery_rules(state)
+            
+            # Load tasks and apply recovery
+            loaded_count = 0
+            resumable_count = 0
+            restarting_count = 0
+            
+            import logging
+            logger = logging.getLogger("queue")
+            
+            for task_data in recovered_state["tasks"]:
+                task = QueueTask(
+                    task_id=task_data["task_id"],
+                    url=task_data["url"],
+                    destination=task_data["destination"],
+                    priority=task_data["priority"],
+                    state=TaskState(task_data["state"]),
+                    created_at=task_data["created_at"],
+                    updated_at=task_data["updated_at"],
+                    mode=task_data["mode"],
+                    connections_used=task_data["connections_used"],
+                    error=task_data.get("error"),
+                    progress=task_data.get("progress", 0.0),
+                    speed_bps=task_data.get("speed_bps", 0.0),
+                    resume_state_path=task_data.get("resume_state_path"),
+                    history_id=task_data.get("history_id"),
+                    # V2.8 fields with defaults
+                    attempt=task_data.get("attempt", 0),
+                    max_attempts=task_data.get("max_attempts", self.retry_max_attempts),
+                    next_eligible_at=task_data.get("next_eligible_at"),
+                    last_error=task_data.get("last_error"),
+                    host=task_data.get("host"),
+                    effective_priority=task_data.get("effective_priority", task_data["priority"])
+                )
+                
+                self.tasks[task.task_id] = task
+                self.cancel_events[task.task_id] = threading.Event()
+                loaded_count += 1
+                
+                # Log recovery action taken per task
+                if task.state == TaskState.PAUSED and task_data["state"] in ["STARTING", "DOWNLOADING"]:
+                    logger.info(f"RECOVERY | TASK | task_id={task.task_id} | from={task_data['state']} -> PAUSED | action=resume")
+                    resumable_count += 1
+                elif task.state == TaskState.PENDING and task_data["state"] == "RETRY_WAIT":
+                    logger.info(f"RECOVERY | TASK | task_id={task.task_id} | from=RETRY_WAIT -> PENDING | action=restart")
+                    restarting_count += 1
+                else:
+                    logger.info(f"RECOVERY | TASK | task_id={task.task_id} | from={task_data['state']} -> {task.state.value} | action=skip")
+                
+                # Add terminal tasks to history
+                if task.state in [TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED]:
+                    self._add_to_history(task)
+            
+            logger.info(f"QUEUEPERSIST | LOAD_OK | tasks={loaded_count} | path={self.queue_state_path}")
+            logger.info(f"RECOVERY | SUMMARY | loaded={loaded_count} | resumable={resumable_count} | restarting={restarting_count}")
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger("queue")
+            logger.error(f"QUEUEPERSIST | LOAD_FAIL | error={str(e)}")
+            # Don't fail startup, just log and continue with empty queue
+            logger.warning(f"Starting with empty queue due to persistence load failure")
+        
     def _log_task(self, level: int, task_id: str, msg: str, **extra):
         """Structured task logging with consistent format"""
         import logging
@@ -379,6 +461,7 @@ class QueueManager:
                 elif success:
                     task.state = TaskState.COMPLETED
                     task.progress = 100.0
+                    self._handle_task_success(task)
                     self._log_task(20, task_id, "COMPLETED", duration=f"{duration:.2f}s", 
                                   progress="100%")  # INFO
                 else:
@@ -573,7 +656,13 @@ class QueueManager:
             try:
                 from queue_persistence import save_queue_state
                 save_queue_state(self, self.queue_state_path)
+                import logging
+                logger = logging.getLogger("queue")
+                logger.info(f"QUEUEPERSIST | SAVE_OK | tasks={len(self.tasks)} | path={self.queue_state_path}")
             except Exception as e:
+                import logging
+                logger = logging.getLogger("queue")
+                logger.error(f"QUEUEPERSIST | SAVE_FAIL | error={str(e)}")
                 # FAIL LOUDLY when persistence is enabled
                 raise RuntimeError(f"Queue persistence failed: {e}")
     
@@ -676,6 +765,9 @@ class QueueManager:
         """Handle task failure with V2.8 retry logic"""
         task.last_error = error_msg
         
+        import logging
+        logger = logging.getLogger("queue")
+        
         # Check if retry is enabled and we have attempts left
         if (self.retry_enabled and 
             task.attempt < task.max_attempts and
@@ -688,10 +780,30 @@ class QueueManager:
             # Transition to RETRY_WAIT
             task.state = TaskState.RETRY_WAIT
             task.next_eligible_at = next_time.isoformat()
+            
+            # Log retry scheduling
+            logger.info(f"RETRY | SCHEDULED | task_id={task.task_id} | attempt={task.attempt}/{task.max_attempts} | in={delay:.1f}s | reason={error_msg[:50]}")
+            
         else:
             # No more retries - final failure
             task.state = TaskState.FAILED
             task.error = error_msg
+            
+            if self.retry_enabled and task.attempt >= task.max_attempts:
+                # Exhausted retries
+                logger.info(f"RETRY | EXHAUSTED | task_id={task.task_id} | attempts={task.attempt} | final_error={error_msg[:50]}")
+            else:
+                # Not retryable or retries disabled
+                logger.info(f"RETRY | NOT_RETRYABLE | task_id={task.task_id} | error={error_msg[:50]}")
+    
+    def _handle_task_success(self, task: QueueTask):
+        """Handle task success with retry reset logging"""
+        import logging
+        logger = logging.getLogger("queue")
+        
+        if task.attempt > 1:
+            # This task succeeded after previous failures
+            logger.info(f"RETRY | RESET | task_id={task.task_id} | reason=success")
     
     @classmethod
     def restore_from_disk(cls, path: str) -> 'QueueManager':
