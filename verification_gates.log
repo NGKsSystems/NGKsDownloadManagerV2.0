@@ -1,0 +1,11 @@
+2026-02-06 15:54:22,336 - policy - INFO - POLICY | LOAD_OK | version=1.0 | path=config/policy.json
+2026-02-06 15:54:22,336 - policy - INFO - POLICY | LOAD_OK | version=1.0 | path=config/policy.json
+2026-02-06 15:54:22,337 - policy - INFO - POLICY | CHECK | scope=task | rule=enqueue | task_id=g1_blocked_exe
+2026-02-06 15:54:22,337 - policy - INFO - POLICY | CHECK | scope=task | rule=enqueue | task_id=g1_blocked_host
+2026-02-06 15:54:22,337 - policy - INFO - POLICY | CHECK | scope=task | rule=enqueue | task_id=g1_allow_case
+2026-02-06 15:54:22,337 - policy - INFO - POLICY | CHECK | scope=task | rule=start | task_id=g2_start_test
+2026-02-06 15:54:22,338 - policy - INFO - POLICY | CHECK | scope=task | rule=retry | task_id=g3_max_attempts
+2026-02-06 15:54:22,338 - policy - INFO - POLICY | CHECK | scope=task | rule=retry | task_id=g3_within_limits
+2026-02-06 15:54:22,338 - policy - INFO - POLICY | CHECK | scope=task | rule=resume | task_id=g4_too_small | size=512
+2026-02-06 15:54:22,338 - policy - INFO - POLICY | CHECK | scope=task | rule=resume | task_id=g4_globally_disabled | size=10485760
+2026-02-06 15:54:22,338 - policy - INFO - POLICY | CHECK | scope=task | rule=resume | task_id=g4_allow_large | size=104857600

@@ -15,6 +15,9 @@ from typing import Optional, Dict
 from datetime import datetime
 from pathlib import Path
 
+# Import policy engine
+from policy_engine import PolicyEngine
+
 # Module-level logger
 logger = logging.getLogger(__name__)
 
@@ -44,6 +47,9 @@ class DownloadManager:
         # Multi-connection feature
         self.enable_multi_connection = enable_multi_connection and MULTI_CONNECTION_AVAILABLE
         self.max_connections = max_connections
+        
+        # Initialize policy engine
+        self.policy_engine = PolicyEngine()
         
         if self.enable_multi_connection:
             self.multi_downloader = IntegratedMultiDownloader(max_connections=max_connections)
@@ -267,25 +273,43 @@ class DownloadManager:
                 if resume_state:
                     logger.info(f"RESUME | DETECTED | task_id={resume_state.get('task_id', task_id)} | state_file={self._get_resume_file_path(filepath)}")
                     
-                    # Validate resume state
-                    state_valid, state_reason = self._validate_resume_state(resume_state, url, temp_filepath, filepath)
-                    if state_valid:
-                        # Validate server state
-                        server_valid, server_reason = self._validate_server_state(url, resume_state)
-                        if server_valid:
-                            existing_size = resume_state.get('bytes_completed', 0)
-                            etag = resume_state.get('etag')
-                            last_modified = resume_state.get('last_modified')
-                            logger.info(f"RESUME | VALIDATED | server_check=OK file_check=OK | task_id={resume_state.get('task_id', task_id)}")
-                            logger.info(f"RESUME | START | task_id={resume_state.get('task_id', task_id)} | resuming_from_bytes={existing_size}")
-                        else:
-                            logger.info(f"RESUME | INVALIDATED | reason={server_reason} | task_id={resume_state.get('task_id', task_id)}")
-                            resume_state = None
-                            existing_size = 0
-                    else:
-                        logger.info(f"RESUME | INVALIDATED | reason={state_reason} | task_id={resume_state.get('task_id', task_id)}")
+                    # Policy gate: Check resume policy
+                    policy_decision = self.policy_engine.check_resume_policy(
+                        task_id=task_id,
+                        url=url,
+                        file_path=filepath,
+                        current_size=resume_state.get('bytes_completed', 0)
+                    )
+                    
+                    if policy_decision.action == "DENY":
+                        logger.info(f"POLICY | RESUME_DENIED | task_id={task_id} | reason={policy_decision.reason}")
                         resume_state = None
                         existing_size = 0
+                        # Clean up temp file if policy denies resume
+                        if os.path.exists(temp_filepath):
+                            os.remove(temp_filepath)
+                    elif policy_decision.action == "ALLOW":
+                        logger.info(f"POLICY | RESUME_ALLOWED | task_id={task_id} | reason={policy_decision.reason}")
+                        
+                        # Validate resume state
+                        state_valid, state_reason = self._validate_resume_state(resume_state, url, temp_filepath, filepath)
+                        if state_valid:
+                            # Validate server state
+                            server_valid, server_reason = self._validate_server_state(url, resume_state)
+                            if server_valid:
+                                existing_size = resume_state.get('bytes_completed', 0)
+                                etag = resume_state.get('etag')
+                                last_modified = resume_state.get('last_modified')
+                                logger.info(f"RESUME | VALIDATED | server_check=OK file_check=OK | task_id={resume_state.get('task_id', task_id)}")
+                                logger.info(f"RESUME | START | task_id={resume_state.get('task_id', task_id)} | resuming_from_bytes={existing_size}")
+                            else:
+                                logger.info(f"RESUME | INVALIDATED | reason={server_reason} | task_id={resume_state.get('task_id', task_id)}")
+                                resume_state = None
+                                existing_size = 0
+                        else:
+                            logger.info(f"RESUME | INVALIDATED | reason={state_reason} | task_id={resume_state.get('task_id', task_id)}")
+                            resume_state = None
+                            existing_size = 0
                 
                 if not resume_state and existing_size == 0:
                     # Clean up invalid temp file

@@ -17,6 +17,14 @@ from urllib.parse import urlparse
 from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass, asdict
 
+# STEP 5: Policy Engine Integration (Policy Layer Only)
+try:
+    from policy_engine import get_policy_engine, PolicyDecision
+    POLICY_ENGINE_AVAILABLE = True
+except ImportError:
+    POLICY_ENGINE_AVAILABLE = False
+    PolicyDecision = None
+
 
 class TaskState(Enum):
     """Task state enumeration with valid transitions"""
@@ -227,11 +235,27 @@ class QueueManager:
         
     def enqueue(self, task_id: str, url: str, destination: str, 
                priority: int = 5, mode: str = "auto", connections: int = 1) -> bool:
-        """Enqueue a download task with structured logging"""
+        """Enqueue a download task with structured logging and policy gates"""
         with self.lock:
             if task_id in self.tasks:
                 self._log_task(30, task_id, "DUPLICATE ENQUEUE REJECTED", priority=priority)  # WARNING
                 return False
+                
+            # STEP 5: Policy Gate - Enqueue Decision
+            if POLICY_ENGINE_AVAILABLE:
+                try:
+                    policy_engine = get_policy_engine()
+                    decision = policy_engine.check_enqueue_policy(task_id, url, destination, 
+                                                                 priority=priority, mode=mode, connections=connections)
+                    policy_engine.apply_policy_decision(decision, task_id)
+                    
+                    if decision.action == 'DENY':
+                        self._log_task(30, task_id, "POLICY_DENIED", reason=decision.reason)  # WARNING
+                        return False
+                except Exception as e:
+                    # Policy errors should not break enqueue - log and continue
+                    import logging
+                    logging.getLogger("policy").error(f"POLICY | ERROR | enqueue_check | task_id={task_id} | error={str(e)}")
                 
             now = datetime.now().isoformat()
             
@@ -364,7 +388,26 @@ class QueueManager:
                         break
     
     def _start_worker(self, task: QueueTask):
-        """Start a worker thread for a task with structured logging"""
+        """Start a worker thread for a task with structured logging and policy gates"""
+        # STEP 5: Policy Gate - Start Decision  
+        if POLICY_ENGINE_AVAILABLE:
+            try:
+                policy_engine = get_policy_engine()
+                decision = policy_engine.check_start_policy(task.task_id, task.url)
+                policy_engine.apply_policy_decision(decision, task.task_id)
+                
+                if decision.action == 'DENY':
+                    self._log_task(30, task.task_id, "POLICY_START_DENIED", reason=decision.reason)  # WARNING
+                    task.state = TaskState.FAILED
+                    task.error = f"Policy denied start: {decision.reason}"
+                    task.updated_at = datetime.now().isoformat()
+                    self._persist_state_if_enabled()
+                    return
+            except Exception as e:
+                # Policy errors should not break start - log and continue
+                import logging
+                logging.getLogger("policy").error(f"POLICY | ERROR | start_check | task_id={task.task_id} | error={str(e)}")
+        
         task.state = TaskState.STARTING
         task.updated_at = datetime.now().isoformat()
         task.attempt += 1  # V2.8: Increment attempt counter
@@ -762,14 +805,30 @@ class QueueManager:
         return eligible
     
     def _handle_task_failure(self, task: QueueTask, error_msg: str):
-        """Handle task failure with V2.8 retry logic"""
+        """Handle task failure with V2.8 retry logic and policy gates"""
         task.last_error = error_msg
         
         import logging
         logger = logging.getLogger("queue")
         
-        # Check if retry is enabled and we have attempts left
-        if (self.retry_enabled and 
+        # STEP 5: Policy Gate - Retry Decision
+        retry_allowed_by_policy = True
+        if POLICY_ENGINE_AVAILABLE:
+            try:
+                policy_engine = get_policy_engine()
+                decision = policy_engine.check_retry_policy(task.task_id, task.attempt, task.max_attempts, error_msg)
+                policy_engine.apply_policy_decision(decision, task.task_id)
+                
+                if decision.action == 'DENY':
+                    retry_allowed_by_policy = False
+                    logger.info(f"POLICY | RETRY_DENIED | task_id={task.task_id} | reason={decision.reason}")
+            except Exception as e:
+                # Policy errors should not break retry logic - log and continue
+                logger.error(f"POLICY | ERROR | retry_check | task_id={task.task_id} | error={str(e)}")
+        
+        # Check if retry is enabled and we have attempts left (with policy override)
+        if (retry_allowed_by_policy and 
+            self.retry_enabled and 
             task.attempt < task.max_attempts and
             self._is_retryable_error(error_msg)):
             
