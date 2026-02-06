@@ -10,6 +10,9 @@ from urllib.parse import urlparse, unquote
 import time
 import hashlib
 import logging
+import json
+from typing import Optional, Dict
+from datetime import datetime
 from pathlib import Path
 
 # Module-level logger
@@ -47,6 +50,125 @@ class DownloadManager:
             print(f"Multi-connection downloads enabled (max {max_connections} connections per file)")
         else:
             print("Using single-connection downloads only")
+    
+    def _get_resume_file_path(self, filepath: str) -> str:
+        """Get path to resume state file"""
+        return f"{filepath}.resume"
+    
+    def _save_resume_state(self, task_id: str, url: str, final_path: str, temp_path: str, 
+                          total_size: int, bytes_completed: int, etag: str = None, 
+                          last_modified: str = None) -> None:
+        """Save resume state for crash recovery"""
+        resume_path = self._get_resume_file_path(final_path)
+        state = {
+            "version": "3.0",
+            "task_id": task_id,
+            "url": url,
+            "final_path": final_path,
+            "temp_path": temp_path,
+            "mode": "single",
+            "total_size": total_size,
+            "bytes_completed": bytes_completed,
+            "etag": etag,
+            "last_modified": last_modified,
+            "segments": [{
+                "id": 0,
+                "start": 0,
+                "end": total_size - 1,
+                "part_file": temp_path,
+                "bytes_written": bytes_completed,
+                "verified": False
+            }],
+            "timestamps": {
+                "created": datetime.now().isoformat(),
+                "last_updated": datetime.now().isoformat(),
+                "last_verified": None
+            },
+            "session": {
+                "id": f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "crash_recovery": True
+            }
+        }
+        
+        try:
+            with open(resume_path, 'w') as f:
+                json.dump(state, f, indent=2)
+            logger.info(f"RESUME | STATE_SAVED | task_id={task_id} | bytes={bytes_completed}")
+        except Exception as e:
+            logger.warning(f"Failed to save resume state: {e}")
+    
+    def _load_resume_state(self, filepath: str) -> Optional[Dict]:
+        """Load resume state from file"""
+        resume_path = self._get_resume_file_path(filepath)
+        if not os.path.exists(resume_path):
+            return None
+        
+        try:
+            with open(resume_path, 'r') as f:
+                state = json.load(f)
+            return state
+        except Exception as e:
+            logger.warning(f"Failed to load resume state: {e}")
+            return None
+    
+    def _validate_resume_state(self, state: Dict, url: str, temp_path: str, 
+                              final_path: str) -> tuple[bool, str]:
+        """Validate resume state for safety"""
+        # Check final file doesn't exist
+        if os.path.exists(final_path):
+            return False, "final_file_exists"
+        
+        # Check URL unchanged
+        if state.get('url') != url:
+            return False, "url_mismatch"
+        
+        # Check temp file exists and size is valid
+        if not os.path.exists(temp_path):
+            return False, "temp_file_missing"
+        
+        actual_size = os.path.getsize(temp_path)
+        recorded_size = state.get('bytes_completed', 0)
+        
+        if actual_size > recorded_size:
+            return False, "temp_file_oversized"
+        
+        return True, "valid"
+    
+    def _validate_server_state(self, url: str, state: Dict) -> tuple[bool, str]:
+        """Validate server state hasn't changed"""
+        try:
+            response = requests.head(url, allow_redirects=True)
+            response.raise_for_status()
+            
+            # Check Content-Length unchanged
+            server_size = int(response.headers.get('content-length', 0))
+            if server_size != state.get('total_size', 0):
+                return False, "content_length_mismatch"
+            
+            # Check ETag unchanged if available
+            etag = response.headers.get('etag')
+            if etag and state.get('etag') and etag != state.get('etag'):
+                return False, "etag_mismatch"
+            
+            # Check Last-Modified unchanged if available  
+            last_modified = response.headers.get('last-modified')
+            if (last_modified and state.get('last_modified') and 
+                last_modified != state.get('last_modified')):
+                return False, "last_modified_mismatch"
+            
+            return True, "valid"
+        except Exception as e:
+            return False, f"server_error_{str(e)}"
+    
+    def _cleanup_resume_state(self, filepath: str, task_id: str) -> None:
+        """Clean up resume state file after successful completion"""
+        resume_path = self._get_resume_file_path(filepath)
+        try:
+            if os.path.exists(resume_path):
+                os.remove(resume_path)
+                logger.info(f"RESUME | CLEANUP | task_id={task_id} | state_file_deleted=true")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup resume state: {e}")
         
     def download(self, url, destination, progress_callback=None, resume=True, 
                 max_connections=None, priority=5, **options):
@@ -108,7 +230,10 @@ class DownloadManager:
         
         # Fallback to basic single-connection download
         logger.info(f"Using single-connection fallback for {url}")
-        success = self._basic_download(url, filepath, progress_callback, resume)
+        
+        # Generate task_id for resume support
+        task_id = f"dl_{int(time.time())}"
+        success = self._basic_download(url, filepath, progress_callback, resume, task_id=task_id)
         
         # Note: Hash verification is already handled in _basic_download
         # Return tuple for consistency with multi-connection downloader
@@ -120,7 +245,7 @@ class DownloadManager:
         }
         return success, info
     
-    def _basic_download(self, url, filepath, progress_callback=None, resume=True):
+    def _basic_download(self, url, filepath, progress_callback=None, resume=True, task_id="unknown"):
         """Basic single-connection download with resume support and atomic file handling"""
         filename = os.path.basename(filepath)
         
@@ -131,59 +256,74 @@ class DownloadManager:
             # STEP 2: Log atomic operation start
             logger.info(f"ATOMIC | START | final={filepath} | temp={temp_filepath}")
             
-            # Check if temp file already exists and get size for resume
+            # STEP 3: Resume detection and validation
+            resume_state = None
             existing_size = 0
-            if os.path.exists(temp_filepath) and resume:
-                existing_size = os.path.getsize(temp_filepath)
-                logger.info(f"ATOMIC | RESUME | temp={temp_filepath} | existing_size={existing_size}")
+            etag = None
+            last_modified = None
             
-            # Get file info from server
+            if resume and os.path.exists(temp_filepath):
+                resume_state = self._load_resume_state(filepath)
+                if resume_state:
+                    logger.info(f"RESUME | DETECTED | task_id={resume_state.get('task_id', task_id)} | state_file={self._get_resume_file_path(filepath)}")
+                    
+                    # Validate resume state
+                    state_valid, state_reason = self._validate_resume_state(resume_state, url, temp_filepath, filepath)
+                    if state_valid:
+                        # Validate server state
+                        server_valid, server_reason = self._validate_server_state(url, resume_state)
+                        if server_valid:
+                            existing_size = resume_state.get('bytes_completed', 0)
+                            etag = resume_state.get('etag')
+                            last_modified = resume_state.get('last_modified')
+                            logger.info(f"RESUME | VALIDATED | server_check=OK file_check=OK | task_id={resume_state.get('task_id', task_id)}")
+                            logger.info(f"RESUME | START | task_id={resume_state.get('task_id', task_id)} | resuming_from_bytes={existing_size}")
+                        else:
+                            logger.info(f"RESUME | INVALIDATED | reason={server_reason} | task_id={resume_state.get('task_id', task_id)}")
+                            resume_state = None
+                            existing_size = 0
+                    else:
+                        logger.info(f"RESUME | INVALIDATED | reason={state_reason} | task_id={resume_state.get('task_id', task_id)}")
+                        resume_state = None
+                        existing_size = 0
+                
+                if not resume_state and existing_size == 0:
+                    # Clean up invalid temp file
+                    if os.path.exists(temp_filepath):
+                        os.remove(temp_filepath)
+            
+            # Get server information
+            response = requests.head(url, allow_redirects=True)
+            response.raise_for_status()
+            total_size = int(response.headers.get('content-length', 0))
+            server_etag = response.headers.get('etag')
+            server_last_modified = response.headers.get('last-modified')
+            
+            # Determine download mode and setup headers
             headers = {}
             if existing_size > 0:
                 headers['Range'] = f'bytes={existing_size}-'
-                
-                # Attempt GET with Range to check for 206; otherwise restart
-                response = requests.get(url, headers=headers, stream=True, allow_redirects=True)
-                
-                if response.status_code == 206:
-                    # Resume download  
-                    total_size = existing_size + int(response.headers.get('content-length', 0))
-                    mode = 'ab'
-                    if progress_callback:
-                        progress_callback({
-                            'filename': filename,
-                            'progress': f"{(existing_size/total_size)*100:.1f}%" if total_size > 0 else "0%",
-                            'speed': "0 B/s",
-                            'status': 'Resuming'
-                        })
-                else:
-                    # Range not supported or failed, restart cleanly
-                    response.close()
-                    existing_size = 0
-                    mode = 'wb'
-                    response = requests.head(url, allow_redirects=True)
-                    total_size = int(response.headers.get('content-length', 0))
+                mode = 'ab'
             else:
-                response = requests.head(url, allow_redirects=True)
-                total_size = int(response.headers.get('content-length', 0))
                 mode = 'wb'
-                
-            if existing_size > 0 and existing_size == total_size:
-                # Temp file already complete, need to verify hash and commit
-                logger.info(f"ATOMIC | TEMP_COMPLETE | temp={temp_filepath} | size={total_size}")
-                # Proceed to hash verification and atomic commit below
-            else:
-                # Continue with download to temp file
-                pass
             
-            # Start download to temp file only if not already complete
-            if not (existing_size > 0 and existing_size == total_size):
-                headers = {}
-                if existing_size > 0:
-                    headers['Range'] = f'bytes={existing_size}-'
-                
+            if existing_size > 0 and existing_size == total_size:
+                # Temp file already complete, proceed to verification
+                logger.info(f"ATOMIC | TEMP_COMPLETE | temp={temp_filepath} | size={total_size}")
+                downloaded_size = total_size
+            else:
+                # Download remaining bytes
                 response = requests.get(url, headers=headers, stream=True, allow_redirects=True)
                 response.raise_for_status()
+                
+                # Verify we got the expected response
+                if existing_size > 0 and response.status_code != 206:
+                    # Server doesn't support range requests, restart
+                    logger.warning(f"RESUME | INVALIDATED | reason=no_range_support | task_id={task_id}")
+                    existing_size = 0
+                    mode = 'wb'
+                    response = requests.get(url, stream=True, allow_redirects=True)
+                    response.raise_for_status()
                 
                 downloaded_size = existing_size
                 start_time = time.time()
@@ -195,25 +335,89 @@ class DownloadManager:
                             f.write(chunk)
                             downloaded_size += len(chunk)
                             
-                            # Update progress
+                            # Save resume state periodically
                             current_time = time.time()
-                            if current_time - last_update >= 0.5:  # Update every 0.5 seconds
-                                elapsed_time = current_time - start_time
-                                if elapsed_time > 0:
-                                    speed = (downloaded_size - existing_size) / elapsed_time
-                                    speed_str = self._format_speed(speed)
-                                else:
-                                    speed_str = "0 B/s"
-                                
-                                if progress_callback:
-                                    progress_callback({
-                                        'filename': filename,
-                                        'progress': f"{(downloaded_size/total_size)*100:.1f}%" if total_size > 0 else f"{self._format_size(downloaded_size)}",
-                                        'speed': speed_str,
-                                        'status': 'Downloading (single connection)'
-                                    })
-                                
+                            if current_time - last_update >= 5.0:  # Save every 5 seconds
+                                self._save_resume_state(task_id, url, filepath, temp_filepath, 
+                                                       total_size, downloaded_size, server_etag, server_last_modified)
                                 last_update = current_time
+                            
+                            # Update progress
+                            if progress_callback and current_time - last_update >= 0.5:
+                                elapsed = current_time - start_time
+                                speed = (downloaded_size - existing_size) / elapsed if elapsed > 0 else 0
+                                progress_callback({
+                                    'filename': filename,
+                                    'progress': f"{(downloaded_size/total_size)*100:.1f}%" if total_size > 0 else "0%",
+                                    'speed': f"{speed:.0f} B/s",
+                                    'status': 'Resuming' if existing_size > 0 else 'Downloading'
+                                })
+                
+                # Final resume state save
+                self._save_resume_state(task_id, url, filepath, temp_filepath, 
+                                       total_size, downloaded_size, server_etag, server_last_modified)
+            
+            # Update progress to verification
+            if progress_callback:
+                progress_callback({
+                    'filename': filename,
+                    'progress': "100%", 
+                    'speed': "0 B/s",
+                    'status': 'Verifying integrity...'
+                })
+            
+            # STEP 1: Hash verification on temp file (PRESERVED FROM BASELINE)
+            logger.info(f"HASH | START | {filename} | verifying SHA256 | temp={temp_filepath}")
+            try:
+                calculated_hash = self._calculate_file_hash(temp_filepath)
+                logger.info(f"HASH | FINAL_OK | {filename} | sha256={calculated_hash[:16]}... | temp={temp_filepath}")
+                
+                # STEP 2: Atomic commit - move temp to final only after hash verification passes (PRESERVED FROM BASELINE)
+                try:
+                    os.replace(temp_filepath, filepath)
+                    logger.info(f"ATOMIC | COMMIT_OK | final={filepath}")
+                    
+                    # Clean up resume state after successful completion
+                    self._cleanup_resume_state(filepath, task_id)
+                    
+                    # Update progress with verification complete
+                    if progress_callback:
+                        progress_callback({
+                            'filename': filename,
+                            'progress': "100%",
+                            'speed': "0 B/s",
+                            'status': 'Completed'
+                        })
+                    
+                    logger.info(f"Basic download completed: {downloaded_size} bytes, verified, committed")
+                    return True
+                except Exception as commit_error:
+                    logger.error(f"ATOMIC | COMMIT_FAIL | final={filepath} | err={str(commit_error)}")
+                    if progress_callback:
+                        progress_callback({
+                            'filename': filename,
+                            'progress': "100%",
+                            'speed': "0 B/s",
+                            'status': f'Atomic commit failed: {str(commit_error)}'
+                        })
+                    return False
+                
+            except Exception as e:
+                logger.error(f"HASH | FINAL_FAIL | {filename} | error={str(e)} | temp={temp_filepath}")
+                if progress_callback:
+                    progress_callback({
+                        'filename': filename,
+                        'progress': "100%",
+                        'speed': "0 B/s", 
+                        'status': f'Hash verification failed: {str(e)}'
+                    })
+                return False
+            
+            # STEP 3: Cleanup resume state on successful completion
+            self._cleanup_resume_state(destination, task_id)
+            
+            # Final success return
+            return True
             
             # Final progress update
             if progress_callback:

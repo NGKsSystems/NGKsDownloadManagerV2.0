@@ -196,7 +196,7 @@ class UIAdapter:
             else:
                 try:
                     download_result = self.download_manager.download(
-                        url, destination, progress_callback
+                        url, destination, progress_callback, task_id=task_id
                     )
                     # Handle possible None return or tuple return
                     if download_result is None:
@@ -483,7 +483,7 @@ class UIAdapter:
                 )
             else:
                 download_result = self.download_manager.download(
-                    url, destination, progress_callback
+                    url, destination, progress_callback, task_id=task_id
                 )
                 # Handle tuple result from download manager
                 if isinstance(download_result, tuple) and len(download_result) == 2:

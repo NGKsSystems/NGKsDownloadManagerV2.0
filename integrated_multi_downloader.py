@@ -10,6 +10,7 @@ import time
 import json
 import hashlib
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Callable, Tuple
 from http_range_detector import supports_http_range
@@ -108,42 +109,74 @@ class IntegratedMultiDownloader:
         logger.info("Download cancellation requested")
         
     def _get_state_file_path(self, destination: str) -> str:
-        """Get path to state file for resume functionality"""
-        return f"{destination}.downloadstate.json"
+        """Get path to resume state file for STEP 3 compatibility"""
+        return f"{destination}.resume"
     
-    def _save_state(self, url: str, destination: str, total_size: int, segments: list, 
+    def _save_state(self, task_id: str, url: str, destination: str, total_size: int, segments: list, 
                    etag: str = None, last_modified: str = None):
-        """Save download state for resume"""
+        """Save download state for resume following STEP 3 format"""
+        # Calculate total bytes completed
+        bytes_completed = sum(seg.get('bytes_written', 0) for seg in segments if isinstance(seg, dict))
+        
         state = {
-            'url': url,
-            'destination': destination,
-            'total_size': total_size,
-            'segment_size': self.segment_size,
-            'max_connections': self.max_connections,
-            'etag': etag,
-            'last_modified': last_modified,
-            'segments': [
+            "version": "3.0",
+            "task_id": task_id,
+            "url": url,
+            "final_path": destination,
+            "temp_path": f"{destination}.part",
+            "mode": "multi",
+            "total_size": total_size,
+            "bytes_completed": bytes_completed,
+            "etag": etag,
+            "last_modified": last_modified,
+            "segments": [
                 {
-                    'id': seg_id,
-                    'start': start,
-                    'end': end,
-                    'part_file': part_file,
-                    'completed': False,
-                    'bytes_written': 0
+                    "id": seg_data.get('id', i) if isinstance(seg_data, dict) else i,
+                    "start": seg_data.get('start', 0) if isinstance(seg_data, dict) else seg_data[0],
+                    "end": seg_data.get('end', 0) if isinstance(seg_data, dict) else seg_data[1], 
+                    "part_file": seg_data.get('part_file', '') if isinstance(seg_data, dict) else seg_data[2],
+                    "bytes_written": seg_data.get('bytes_written', 0) if isinstance(seg_data, dict) else 0,
+                    "verified": seg_data.get('completed', False) if isinstance(seg_data, dict) else False
                 }
-                for start, end, part_file, seg_id in segments
-            ]
+                for i, seg_data in enumerate(segments)
+            ],
+            "timestamps": {
+                "created": datetime.now().isoformat(),
+                "last_updated": datetime.now().isoformat(),
+                "last_verified": None
+            },
+            "session": {
+                "id": f"session_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "crash_recovery": True
+            }
         }
         
         state_file = self._get_state_file_path(destination)
+        temp_file = f"{state_file}.tmp"
         try:
-            with open(state_file, 'w') as f:
+            with open(temp_file, 'w') as f:
                 json.dump(state, f, indent=2)
-            logger.info(f"Saved download state to {state_file}")
+            
+            # Atomic replacement (preserving baseline integrity)
+            os.replace(temp_file, state_file)
+            logger.info(f"RESUME | STATE_SAVED | task_id={task_id} | bytes={bytes_completed}")
         except Exception as e:
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
             logger.warning(f"Failed to save state: {e}")
     
-    def _load_state(self, destination: str) -> Optional[Dict]:
+    def _cleanup_resume_state(self, destination: str, task_id: str) -> None:
+        """Clean up resume state file after successful completion"""
+        state_file = self._get_state_file_path(destination)
+        try:
+            if os.path.exists(state_file):
+                os.remove(state_file)
+                logger.info(f"RESUME | CLEANUP | task_id={task_id} | state_file_deleted=true")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup resume state: {e}")
         """Load download state for resume"""
         state_file = self._get_state_file_path(destination)
         if not os.path.exists(state_file):
@@ -156,8 +189,16 @@ class IntegratedMultiDownloader:
             return state
         except Exception as e:
             logger.warning(f"Failed to load state: {e}")
-            return None
-    
+            return None    
+    def _cleanup_resume_state(self, destination: str, task_id: str) -> None:
+        """Clean up resume state file after successful completion"""
+        state_file = self._get_state_file_path(destination)
+        try:
+            if os.path.exists(state_file):
+                os.remove(state_file)
+                logger.info(f"RESUME | CLEANUP | task_id={task_id} | state_file_deleted=true")
+        except Exception as e:
+            logger.warning(f"\1")    
     def _archive_old_state(self, destination: str):
         """Archive old state and part files"""
         import time
@@ -285,13 +326,35 @@ class IntegratedMultiDownloader:
             info['download_time'] = time.time() - start_time
     
     def _single_connection_download(self, url: str, destination: str, 
-                                   progress_callback: Optional[Callable], info: Dict) -> Tuple[bool, Dict]:
-        """Single connection download (fallback)"""
+                                   progress_callback: Optional[Callable], info: Dict, 
+                                   task_id: Optional[str] = None) -> Tuple[bool, Dict]:
+        """Single connection download (fallback) - delegates to DownloadManager for resume support"""
+        if task_id is None:
+            task_id = f"dl_{int(time.time())}"
+            
         info['mode'] = 'single'
         info['connections_used'] = 1
         
+        # Use DownloadManager's basic download for full resume support
         try:
-            logger.info(f"Single-connection: downloading {url}")
+            from download_manager import DownloadManager
+            dm = DownloadManager(enable_multi_connection=False)  # Disable to prevent recursion
+            
+            logger.info(f"Single-connection: delegating to DownloadManager with resume support")
+            success = dm._basic_download(url, destination, progress_callback, resume=True, task_id=task_id)
+            
+            if success and os.path.exists(destination):
+                info['total_size'] = os.path.getsize(destination)
+            
+            return success, info
+            
+        except ImportError:
+            # Fallback if DownloadManager not available
+            logger.warning("DownloadManager not available, using basic fallback without resume")
+            
+        # Original fallback without resume (kept for safety)
+        try:
+            logger.info(f"Single-connection: downloading {url} (no resume support)")
             
             response = requests.get(url, stream=True, allow_redirects=True, timeout=self.timeout)
             response.raise_for_status()
@@ -351,10 +414,13 @@ class IntegratedMultiDownloader:
             
             logger.info(f"Single-connection: completed {downloaded_bytes} bytes")
             
+            # STEP 3: Cleanup resume state on successful completion 
+            self._cleanup_resume_state(destination, task_id)
+            
             if progress_callback:
                 progress_callback({
                     'filename': os.path.basename(destination),
-                    'progress': "100%",
+                    'progress': "100%", 
                     'status': 'Completed'
                 })
             
@@ -385,16 +451,32 @@ class IntegratedMultiDownloader:
             # Check for existing state
             state = self._load_state(destination)
             resume_segments = None
+            task_id = f"dl_{int(time.time())}"
             
-            if state and self._validate_state_compatibility(state, url, total_size, etag, last_modified):
-                logger.info("Compatible state found - attempting resume")
-                resume_segments = self._check_segment_completion(state['segments'])
-                segments = [(s['start'], s['end'], s['part_file'], s['id']) for s in resume_segments]
-            else:
-                if state:
-                    logger.info("Incompatible state found - archiving and starting fresh")
-                    self._archive_old_state(destination)
+            if state:
+                # STEP 3: Resume detection
+                task_id = state.get('task_id', task_id)  # Use existing task_id for resume
+                logger.info(f"RESUME | DETECTED | task_id={task_id} | state_file={self._get_state_file_path(destination)}")
                 
+                if self._validate_state_compatibility(state, url, total_size, etag, last_modified):
+                    # STEP 3: Resume validation successful
+                    logger.info(f"RESUME | VALIDATED | server_check=OK file_check=OK | task_id={task_id}")
+                    resume_segments = self._check_segment_completion(state['segments'])
+                    segments = [(s['start'], s['end'], s['part_file'], s['id']) for s in resume_segments]
+                    
+                    # Log segment resume status
+                    completed_segments = sum(1 for s in resume_segments if s.get('completed', False))
+                    resuming_segments = [s['id'] for s in resume_segments if not s.get('completed', False)]
+                    logger.info(f"RESUME | SEGMENTS | verified={completed_segments}/{len(resume_segments)} | resuming_segments={resuming_segments}")
+                    logger.info(f"RESUME | START | task_id={task_id} | resuming_from_bytes={state.get('bytes_completed', 0)}")
+                else:
+                    # STEP 3: Resume validation failed
+                    logger.info(f"RESUME | INVALIDATED | reason=state_compatibility | task_id={task_id}")
+                    self._archive_old_state(destination)
+                    state = None
+                    task_id = f"dl_{int(time.time())}"  # Generate new task_id for fresh download
+            
+            if not state:
                 # Calculate new segments
                 segment_size = max(self.segment_size, total_size // self.max_connections)
                 segments = []
@@ -409,7 +491,7 @@ class IntegratedMultiDownloader:
                     segments.append((start, end, part_file, i))
                 
                 # Save initial state
-                self._save_state(url, destination, total_size, segments, etag, last_modified)
+                self._save_state(task_id, url, destination, total_size, segments, etag, last_modified)
             
             part_files = [part_file for _, _, part_file, _ in segments]
             
@@ -472,11 +554,26 @@ class IntegratedMultiDownloader:
                 raise Exception(f"{len(failed_segments)} segments failed")
             
             # Validate each part size equals expected size
+            validated_segments = []
             for i, (start, end, part_file, segment_id) in enumerate(segments):
                 expected_size = end - start + 1
                 actual_size = os.path.getsize(part_file)
                 if actual_size != expected_size:
                     raise Exception(f"Segment {segment_id}: size mismatch (expected {expected_size}, got {actual_size})")
+                
+                # Add to validated segments list for state save
+                validated_segments.append({
+                    'id': segment_id,
+                    'start': start, 
+                    'end': end,
+                    'part_file': part_file,
+                    'bytes_written': actual_size,
+                    'completed': True
+                })
+            
+            # STEP 3: Save final validated state before merge
+            logger.info(f"RESUME | SEGMENTS_VALIDATED | all_completed=true | task_id={task_id}")
+            self._save_state(task_id, url, destination, total_size, validated_segments, etag, last_modified)
 
             # Merge segments into final file using streaming chunks
             logger.info("Multi-connection: merging segments")
@@ -519,10 +616,13 @@ class IntegratedMultiDownloader:
             
             logger.info(f"Multi-connection: completed {total_size} bytes using {len(segments)} connections")
             
+            # STEP 3: Cleanup resume state on successful completion 
+            self._cleanup_resume_state(destination, task_id)
+            
             if progress_callback:
                 progress_callback({
                     'filename': os.path.basename(destination),
-                    'progress': "100%",
+                    'progress': "100%", 
                     'status': 'Completed'
                 })
             
@@ -551,7 +651,7 @@ class IntegratedMultiDownloader:
             
             # Fallback to single connection only on non-cancel failures
             logger.info("Multi-connection: falling back to single connection")
-            return self._single_connection_download(url, destination, progress_callback, info)
+            return self._single_connection_download(url, destination, progress_callback, info, task_id)
 
     def _calculate_file_hash(self, filepath: str) -> str:
         """Calculate SHA256 hash of a file for integrity verification"""
