@@ -150,9 +150,15 @@ class DownloadsTab(QWidget):
         self.clear_btn.setFont(QFont("Segoe UI", 9))
         self.clear_btn.clicked.connect(self.clear_url)
         
+        self.export_diagnostics_btn = QPushButton("Export Diagnostics")
+        self.export_diagnostics_btn.setFont(QFont("Segoe UI", 9))
+        self.export_diagnostics_btn.clicked.connect(self.export_diagnostics)
+        self.export_diagnostics_btn.setToolTip("Export diagnostic pack for troubleshooting")
+        
         button_layout.addWidget(self.download_btn)
         button_layout.addWidget(self.paste_btn)
         button_layout.addWidget(self.clear_btn)
+        button_layout.addWidget(self.export_diagnostics_btn)
         button_layout.addStretch()
         
         # Progress group
@@ -244,6 +250,50 @@ class DownloadsTab(QWidget):
     def clear_url(self):
         """Clear URL input"""
         self.url_entry.clear()
+    
+    def export_diagnostics(self):
+        """
+        Export diagnostic pack for troubleshooting
+        STEP 6: Read-only forensics export
+        """
+        try:
+            # Show working dialog since export might take a moment
+            QMessageBox.information(
+                self, 
+                "Export Diagnostics", 
+                "Creating diagnostic pack... This may take a moment."
+            )
+            
+            # Export via adapter
+            result = self.adapter.export_forensic_diagnostics()
+            
+            if result.get('success', False):
+                export_path = result.get('export_path', '')
+                file_size = result.get('file_size', 0)
+                
+                QMessageBox.information(
+                    self,
+                    "Export Complete",
+                    f"Diagnostic pack created successfully!\n\n"
+                    f"File: {os.path.basename(export_path)}\n"
+                    f"Size: {file_size:,} bytes\n"
+                    f"Location: {export_path}\n\n"
+                    f"This file contains logs, queue state, and configuration data "
+                    f"for troubleshooting purposes."
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Export Failed", 
+                    f"Failed to create diagnostic pack:\n{result.get('error', 'Unknown error')}"
+                )
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Export Error",
+                f"Error creating diagnostic pack:\n{str(e)}"
+            )
     
     def load_default_destination(self):
         """Load default destination from settings"""

@@ -885,6 +885,41 @@ class UIAdapter:
                 'error': str(e)
             }
     
+    def export_forensic_diagnostics(self) -> Dict[str, Any]:
+        """
+        Export comprehensive diagnostic package for troubleshooting
+        STEP 6: Read-only forensics export - zero behavior change
+        """
+        try:
+            self.logger.info("UI.ADAPTER | FORENSICS_EXPORT_START")
+            
+            # Import forensics exporter (lazy import to avoid dependencies)
+            from forensics_exporter import export_diagnostics
+            
+            # Create diagnostic pack
+            export_path = export_diagnostics()
+            
+            # Get file size
+            import os
+            file_size = os.path.getsize(export_path)
+            
+            self.logger.info(f"UI.ADAPTER | FORENSICS_EXPORT_COMPLETE | path={export_path} | size={file_size}")
+            
+            return {
+                'success': True,
+                'export_path': export_path,
+                'file_size': file_size,
+                'message': f'Diagnostic pack created: {os.path.basename(export_path)}'
+            }
+            
+        except Exception as e:
+            self.logger.error(f"UI.ADAPTER | FORENSICS_EXPORT_FAIL | error={str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'message': 'Failed to create diagnostic pack'
+            }
+    
     def list_queue_tasks(self) -> List[Dict[str, Any]]:
         """Get list of all queue tasks"""
         try:
