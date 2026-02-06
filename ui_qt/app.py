@@ -57,14 +57,40 @@ def setup_ui_logging():
     file_handler.setLevel(logging.DEBUG)
     file_handler.flush = lambda: file_handler.stream.flush() if hasattr(file_handler, 'stream') else None
     
+    # Configure root logger at WARNING to reduce noise
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.WARNING,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             file_handler,
             logging.StreamHandler()  # Also log to console
         ]
     )
+    
+    # Set operational loggers to INFO (keep download action logs)
+    logging.getLogger("download_manager").setLevel(logging.INFO)
+    logging.getLogger("integrated_multi_downloader").setLevel(logging.INFO)  
+    logging.getLogger("queue").setLevel(logging.INFO)
+    logging.getLogger("policy").setLevel(logging.INFO)
+    logging.getLogger("forensics").setLevel(logging.INFO)
+    logging.getLogger("unified_executor").setLevel(logging.INFO)
+    
+    # Keep UI startup banner but quiet debug spam
+    logging.getLogger("ui").setLevel(logging.INFO)
+    
+    # Add operational filter to catch remaining dev spam
+    class OperationalFilter(logging.Filter):
+        def filter(self, record):
+            msg = record.getMessage().upper()
+            # Drop obvious dev/phase messages
+            dev_keywords = ['PHASE ', 'GATE ', 'COMPILE ', 'VERIFICATION ', 'CREATED TEST']
+            if any(keyword in msg for keyword in dev_keywords):
+                return False
+            # Allow operational messages  
+            return True
+    
+    # Apply filter to file handler to keep logs clean
+    file_handler.addFilter(OperationalFilter())
     
     logger = logging.getLogger('ui')
     
