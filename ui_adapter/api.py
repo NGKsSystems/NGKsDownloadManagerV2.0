@@ -146,9 +146,13 @@ class UIAdapter:
         """Create minimal file logger if none exists (for CLI verification)"""
         try:
             import os
-            os.makedirs("logs", exist_ok=True)
+            from logging.handlers import RotatingFileHandler
+            os.makedirs(os.path.join("logs", "runtime"), exist_ok=True)
             
-            handler = logging.FileHandler("logs/ui.log", encoding='utf-8')
+            handler = RotatingFileHandler(
+                os.path.join("logs", "runtime", "ui.log"),
+                maxBytes=5*1024*1024, backupCount=5, encoding='utf-8'
+            )
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             
@@ -728,7 +732,7 @@ class UIAdapter:
             dest_path = os.path.join(logs_dir, log_filename)
             
             # Copy log file if it exists
-            log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs', 'ui.log')
+            log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs', 'runtime', 'ui.log')
             if os.path.exists(log_file):
                 shutil.copy2(log_file, dest_path)
                 self.logger.info(f"LOG AUTO-SAVED: {dest_path}")

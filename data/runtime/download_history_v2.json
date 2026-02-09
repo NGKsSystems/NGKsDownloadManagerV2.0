@@ -358,5 +358,25 @@
     "file_size": 0,
     "timestamp": 1770617016,
     "download_time": "2026-02-09 09:03:36"
+  },
+  {
+    "url": "https://youtube.com/watch?v=test456",
+    "filename": "test_video_v2.mp4",
+    "url_type": "youtube",
+    "destination": "/downloads",
+    "status": "completed",
+    "file_size": 2048576,
+    "timestamp": 1770629364,
+    "download_time": "2026-02-09 12:29:24"
+  },
+  {
+    "url": "https://youtube.com/watch?v=test456",
+    "filename": "test_video_v2.mp4",
+    "url_type": "youtube",
+    "destination": "/downloads",
+    "status": "completed",
+    "file_size": 2048576,
+    "timestamp": 1770629378,
+    "download_time": "2026-02-09 12:29:38"
   }
 ]

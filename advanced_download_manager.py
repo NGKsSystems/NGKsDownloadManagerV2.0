@@ -150,14 +150,21 @@ class AdvancedDownloadManager:
     
     def setup_logging(self):
         """Setup logging for the download manager"""
-        log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+        from logging.handlers import RotatingFileHandler
+        log_dir = os.path.join(os.path.dirname(__file__), 'logs', 'runtime')
         os.makedirs(log_dir, exist_ok=True)
+        
+        file_handler = RotatingFileHandler(
+            os.path.join(log_dir, 'download_manager.log'),
+            maxBytes=5*1024*1024, backupCount=5, encoding='utf-8'
+        )
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(os.path.join(log_dir, 'download_manager.log')),
+                file_handler,
                 logging.StreamHandler()
             ]
         )

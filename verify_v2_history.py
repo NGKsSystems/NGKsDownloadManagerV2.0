@@ -4,6 +4,14 @@
 import sys
 import os
 import json
+import io
+
+# Force UTF-8 stdout on Windows to prevent UnicodeEncodeError with emoji
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from utils import HistoryManager
@@ -31,7 +39,7 @@ def test_v2_history_system():
     
     # Verify V2 file exists and contains correct schema
     if os.path.exists("data/runtime/download_history_v2.json"):
-        with open("data/runtime/download_history_v2.json", 'r') as f:
+        with open("data/runtime/download_history_v2.json", 'r', encoding='utf-8') as f:
             entries = json.load(f)
         
         if entries:
@@ -60,7 +68,7 @@ def test_v2_history_system():
     print(f"\n4. Testing V2 deduplication...")
     history.add_download(test_download)  # Same download again
     
-    with open("data/runtime/download_history_v2.json", 'r') as f:
+    with open("data/runtime/download_history_v2.json", 'r', encoding='utf-8') as f:
         entries = json.load(f)
     
     if len(entries) == 1:

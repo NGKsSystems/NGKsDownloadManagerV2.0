@@ -7,6 +7,7 @@ Separate launcher - does NOT modify V1 (main.py)
 import sys
 import os
 import logging
+from logging.handlers import RotatingFileHandler
 import traceback
 import signal
 import threading
@@ -45,17 +46,18 @@ class _StreamToLogger:
 
 def setup_ui_logging():
     """Setup file logging for UI application"""
-    # Create logs directory if it doesn't exist
-    logs_dir = os.path.join(project_root, 'logs')
+    # Create logs/runtime directory if it doesn't exist
+    logs_dir = os.path.join(project_root, 'logs', 'runtime')
     os.makedirs(logs_dir, exist_ok=True)
     
-    # Setup file logger
+    # Setup rotating file logger
     log_file = os.path.join(logs_dir, 'ui.log')
     
-    # Configure logging
-    file_handler = logging.FileHandler(log_file, mode='a')
+    # Configure logging with rotation (5 MB max, 5 backups)
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=5*1024*1024, backupCount=5, encoding='utf-8'
+    )
     file_handler.setLevel(logging.DEBUG)
-    file_handler.flush = lambda: file_handler.stream.flush() if hasattr(file_handler, 'stream') else None
     
     # Configure root logger at WARNING to reduce noise
     logging.basicConfig(
