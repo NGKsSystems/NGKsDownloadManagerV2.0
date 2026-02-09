@@ -13,7 +13,7 @@ def test_v2_history_system():
     print("=== TESTING V2 HISTORY SYSTEM ===")
     
     # Test V2 history manager with V2 file
-    history = HistoryManager("data/download_history_v2.json")
+    history = HistoryManager("data/runtime/download_history_v2.json")
     
     # Test V2 schema
     print("\n1. Testing V2 schema...")
@@ -30,8 +30,8 @@ def test_v2_history_system():
     print(f"Add V2 download: {'✅ SUCCESS' if success else '❌ FAILED'}")
     
     # Verify V2 file exists and contains correct schema
-    if os.path.exists("data/download_history_v2.json"):
-        with open("data/download_history_v2.json", 'r') as f:
+    if os.path.exists("data/runtime/download_history_v2.json"):
+        with open("data/runtime/download_history_v2.json", 'r') as f:
             entries = json.load(f)
         
         if entries:
@@ -49,8 +49,8 @@ def test_v2_history_system():
     else:
         print("❌ V2 history file not created")
     
-    print(f"\n2. V2 History file location: data/download_history_v2.json")
-    print(f"   Exists: {'YES' if os.path.exists('data/download_history_v2.json') else 'NO'}")
+    print(f"\n2. V2 History file location: data/runtime/download_history_v2.json")
+    print(f"   Exists: {'YES' if os.path.exists('data/runtime/download_history_v2.json') else 'NO'}")
     
     print(f"\n3. V1 History separation check:")
     print(f"   V1 file (download_history.json) exists: {'YES' if os.path.exists('download_history.json') else 'NO'}")
@@ -60,7 +60,7 @@ def test_v2_history_system():
     print(f"\n4. Testing V2 deduplication...")
     history.add_download(test_download)  # Same download again
     
-    with open("data/download_history_v2.json", 'r') as f:
+    with open("data/runtime/download_history_v2.json", 'r') as f:
         entries = json.load(f)
     
     if len(entries) == 1:

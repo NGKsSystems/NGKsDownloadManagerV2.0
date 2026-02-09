@@ -42,3 +42,7 @@ tests/dev_scratch/
 # Runtime logs (exclude from tracking but allow dirs to exist)
 logs/*.log
 
+# ---- OPERATIONAL DIRS (DO NOT IGNORE) ----
+# logs/runtime/ - operational runtime logs (if product requires shipping defaults)
+# data/runtime/ - operational runtime data (if product requires shipping defaults)
+
