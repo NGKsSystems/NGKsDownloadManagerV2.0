@@ -474,12 +474,20 @@ class DownloadsTab(QWidget):
                 self._hide_all_options()  # Hide options after successful start
             else:
                 QMessageBox.critical(self, "Error", "Failed to start download: No download ID returned")
+        except ValueError as ve:
+            # Queue rejection (duplicate task_id, policy denial, invalid args) — show reason directly
+            import logging
+            logger = logging.getLogger("ui")
+            q_enabled = self.adapter.settings.get('queue_enabled', False) if hasattr(self.adapter, 'settings') else False
+            logger.warning(f"UI.DOWNLOAD.START.FAIL | reason=ValueError | msg={ve} | url={url} | queue_enabled={q_enabled}")
+            QMessageBox.warning(self, "Download Blocked", str(ve))
         except Exception as e:
-            # Enhanced error logging for debugging
+            # Unexpected error — log with traceback, show generic message
             import traceback
             import logging
             logger = logging.getLogger("ui")
-            logger.error(f"Download start failed with exception: {str(e)}")
+            q_enabled = self.adapter.settings.get('queue_enabled', False) if hasattr(self.adapter, 'settings') else False
+            logger.error(f"UI.DOWNLOAD.START.FAIL | reason={type(e).__name__} | msg={e} | url={url} | queue_enabled={q_enabled}")
             logger.error(f"Full traceback: {traceback.format_exc()}")
             QMessageBox.critical(self, "Error", f"Failed to start download: {str(e)}")
     
