@@ -1,0 +1,362 @@
+[
+  {
+    "url": "https://youtube.com/watch?v=test456",
+    "filename": "test_video_v2.mp4",
+    "url_type": "youtube",
+    "destination": "/downloads",
+    "status": "completed",
+    "file_size": 2048576,
+    "timestamp": 1770192896,
+    "download_time": "2026-02-04 11:14:56"
+  },
+  {
+    "url": "https://youtu.be/ii-0QOwYYLM?si=KzRTWXJ4hPjhFvdZ",
+    "filename": "“Behind the Silence”",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770194518,
+    "download_time": "2026-02-04 11:41:58"
+  },
+  {
+    "url": "https://youtu.be/PlpizmppUCY?si=9h-YUY0mrFaIeOhJ",
+    "filename": "Shinedown - Searchlight (Official Video)",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770195231,
+    "download_time": "2026-02-04 11:53:51"
+  },
+  {
+    "url": "https://youtu.be/G_2SPkSG4bI?si=Z9roROicSRTabjAb",
+    "filename": "“You Don’t See The War”",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770197285,
+    "download_time": "2026-02-04 12:28:05"
+  },
+  {
+    "url": "https://youtu.be/cl96GHWtSHI?si=djwFg-p4LLwNV4MA",
+    "filename": "Ain't Always Me Behind These Eyes",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770197968,
+    "download_time": "2026-02-04 12:39:28"
+  },
+  {
+    "url": "https://youtu.be/cl96GHWtSHI?si=djwFg-p4LLwNV4MA",
+    "filename": "Ain't Always Me Behind These Eyes",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770198080,
+    "download_time": "2026-02-04 12:41:20"
+  },
+  {
+    "url": "https://youtu.be/EqcUGFyN4o4?si=RHTmuUbeNy35tw6S",
+    "filename": "“Blackout Mind”",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770198126,
+    "download_time": "2026-02-04 12:42:06"
+  },
+  {
+    "url": "https://youtu.be/IVVqhhuRiew?si=mUJDHrcDl8qDm2bf",
+    "filename": "“Too Tired To Fight”",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770292556,
+    "download_time": "2026-02-05 14:55:56"
+  },
+  {
+    "url": "https://youtu.be/Y0o1BRqmLXI?si=GLVtKtkiMjZkdm6_",
+    "filename": "“Scars Ain’t Shame”",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770292984,
+    "download_time": "2026-02-05 15:03:04"
+  },
+  {
+    "url": "https://httpbin.org/bytes/102400",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770294061,
+    "download_time": "2026-02-05 15:21:01"
+  },
+  {
+    "url": "https://youtu.be/N2o-c06DOS8?si=YEeumeR69fxVi8A3",
+    "filename": "“Silent War”",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770297997,
+    "download_time": "2026-02-05 16:26:37"
+  },
+  {
+    "url": "https://youtu.be/2IF5TfnmV0k?si=hILdvhJ5A1S3TzLb",
+    "filename": "Shinedown - I'll Follow You (Official Video)",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770300093,
+    "download_time": "2026-02-05 17:01:33"
+  },
+  {
+    "url": "https://httpbin.org/bytes/102400",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770304975,
+    "download_time": "2026-02-05 18:22:55"
+  },
+  {
+    "url": "https://httpbin.org/bytes/102400",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770316350,
+    "download_time": "2026-02-05 21:32:30"
+  },
+  {
+    "url": "http://httpbin.org/bytes/5000000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770355411,
+    "download_time": "2026-02-06 08:23:31"
+  },
+  {
+    "url": "http://httpbin.org/bytes/2048000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770355558,
+    "download_time": "2026-02-06 08:25:58"
+  },
+  {
+    "url": "http://httpbin.org/bytes/1024000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770355561,
+    "download_time": "2026-02-06 08:26:01"
+  },
+  {
+    "url": "http://httpbin.org/bytes/3000000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770362081,
+    "download_time": "2026-02-06 10:14:41"
+  },
+  {
+    "url": "http://httpbin.org/bytes/1500000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770362085,
+    "download_time": "2026-02-06 10:14:45"
+  },
+  {
+    "url": "http://httpbin.org/bytes/5000000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770366340,
+    "download_time": "2026-02-06 11:25:40"
+  },
+  {
+    "url": "http://httpbin.org/bytes/2048000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770366348,
+    "download_time": "2026-02-06 11:25:48"
+  },
+  {
+    "url": "http://httpbin.org/bytes/1000000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770366362,
+    "download_time": "2026-02-06 11:26:02"
+  },
+  {
+    "url": "http://httpbin.org/bytes/1500000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770366365,
+    "download_time": "2026-02-06 11:26:05"
+  },
+  {
+    "url": "http://httpbin.org/bytes/4000000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770372428,
+    "download_time": "2026-02-06 13:07:08"
+  },
+  {
+    "url": "http://httpbin.org/bytes/2500000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770372437,
+    "download_time": "2026-02-06 13:07:17"
+  },
+  {
+    "url": "http://httpbin.org/bytes/1800000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770372447,
+    "download_time": "2026-02-06 13:07:27"
+  },
+  {
+    "url": "http://httpbin.org/bytes/1500000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770372449,
+    "download_time": "2026-02-06 13:07:29"
+  },
+  {
+    "url": "http://httpbin.org/bytes/3200000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770372461,
+    "download_time": "2026-02-06 13:07:41"
+  },
+  {
+    "url": "http://httpbin.org/bytes/2800000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:\\Users\\suppo\\Downloads\\NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770372462,
+    "download_time": "2026-02-06 13:07:42"
+  },
+  {
+    "url": "http://httpbin.org/bytes/2048000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:/Users/suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770374920,
+    "download_time": "2026-02-06 13:48:40"
+  },
+  {
+    "url": "http://httpbin.org/bytes/1024000",
+    "filename": "NGK_Downloads",
+    "url_type": "Unknown",
+    "destination": "C:/Users/suppo/Downloads/NGK_Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770374922,
+    "download_time": "2026-02-06 13:48:42"
+  },
+  {
+    "url": "https://youtube.com/watch?v=test456",
+    "filename": "test_video_v2.mp4",
+    "url_type": "youtube",
+    "destination": "/downloads",
+    "status": "completed",
+    "file_size": 2048576,
+    "timestamp": 1770610473,
+    "download_time": "2026-02-09 07:14:33"
+  },
+  {
+    "url": "https://youtu.be/dQw4w9WgXcQ",
+    "filename": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770616226,
+    "download_time": "2026-02-09 08:50:26"
+  },
+  {
+    "url": "https://youtu.be/dQw4w9WgXcQ",
+    "filename": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770616298,
+    "download_time": "2026-02-09 08:51:38"
+  },
+  {
+    "url": "https://youtube.com/watch?v=test456",
+    "filename": "test_video_v2.mp4",
+    "url_type": "youtube",
+    "destination": "/downloads",
+    "status": "completed",
+    "file_size": 2048576,
+    "timestamp": 1770617006,
+    "download_time": "2026-02-09 09:03:26"
+  },
+  {
+    "url": "https://youtu.be/dQw4w9WgXcQ",
+    "filename": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+    "url_type": "YouTube",
+    "destination": "C:\\Users\\suppo/Downloads",
+    "status": "Completed",
+    "file_size": 0,
+    "timestamp": 1770617016,
+    "download_time": "2026-02-09 09:03:36"
+  }
+]

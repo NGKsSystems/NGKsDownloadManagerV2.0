@@ -89,7 +89,7 @@ class QueueManager:
     """Download queue manager with concurrency control"""
     
     def __init__(self, max_active_downloads: int = 2, persist_queue: bool = False, 
-                 queue_state_path: str = "data/queue_state.json",
+                 queue_state_path: str = "data/runtime/queue_state.json",
                  # V2.8 retry/backoff config
                  retry_enabled: bool = False, retry_max_attempts: int = 3,
                  retry_backoff_base_s: float = 2.0, retry_backoff_max_s: float = 300.0,

@@ -199,7 +199,7 @@ class UIAdapter:
             self.queue_manager = QueueManager(
                 max_active_downloads=config.get('max_active_downloads', 2),
                 persist_queue=config.get('persist_queue', False),
-                queue_state_path=config.get('queue_state_path', "data/queue_state.json"),
+                queue_state_path=config.get('queue_state_path', "data/runtime/queue_state.json"),
                 retry_enabled=config.get('retry_enabled', False),
                 retry_max_attempts=config.get('retry_max_attempts', 3),
                 retry_backoff_base_s=config.get('retry_backoff_base_s', 2.0),

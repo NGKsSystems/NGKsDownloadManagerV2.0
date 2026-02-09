@@ -19,21 +19,26 @@ coverage.xml
 Thumbs.db
 .vscode/
 .idea/
+.history/
+.vscode/.history/
 
-# ---- Project runtime / gate artifacts (MUST NOT BE TRACKED) ----
-data/
+# ---- Dev/Build artifacts (MUST NOT BE TRACKED) ----
+artifacts/gates/
+artifacts/verification/
+artifacts/test-downloads/
+artifacts/exports/
+data/gates/
+logs_archive/
+downloads/
+exports/
 *_core_test.txt
 v*_output.txt
 acceptance_output.txt
-.history/
-downloads/
-logs/
 
 cache/
 config/
-exports/
-
-logs_archive/
 tests/dev_scratch/
-.history/
+
+# Runtime logs (exclude from tracking but allow dirs to exist)
+logs/*.log
 
