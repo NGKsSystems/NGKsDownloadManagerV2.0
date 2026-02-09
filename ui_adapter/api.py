@@ -14,6 +14,7 @@ from queue import Queue
 import time
 from datetime import datetime
 import socket
+import uuid
 from urllib.parse import urlparse
 
 # Engine imports (adapter only layer touches these)
@@ -231,7 +232,41 @@ class UIAdapter:
             self.logger.error(f"Failed to initialize queue manager: {e}")
             self.queue_manager = None
     
-    def _queue_downloader_wrapper(self, task_id: str, url: str, destination: str, 
+    def _queue_downloader_wrapper(self, *args, **kwargs):
+        """
+        Unified downloader wrapper. Handles all calling conventions:
+        1) QueueManager style: (url, destination, task_id=, progress_callback=, ...)
+        2) Legacy positional:  (task_id, url, destination, progress_callback, **opts)
+        3) All-keyword:        (task_id=, url=, destination=, progress_callback=, ...)
+        """
+        task_id = kwargs.pop("task_id", None)
+        url = kwargs.pop("url", None)
+        destination = kwargs.pop("destination", None)
+        progress_callback = kwargs.pop("progress_callback", None)
+
+        if len(args) >= 4:
+            # Legacy: (task_id, url, destination, progress_callback)
+            task_id = task_id or args[0]
+            url = url or args[1]
+            destination = destination or args[2]
+            progress_callback = progress_callback or args[3]
+        elif len(args) >= 2:
+            # QueueManager: (url, destination) + keyword args
+            url = url or args[0]
+            destination = destination or args[1]
+        elif len(args) == 1:
+            url = url or args[0]
+
+        if not task_id or not url or not destination or progress_callback is None:
+            raise TypeError(
+                f"Queue downloader wrapper missing required args: "
+                f"task_id={task_id} url={url} destination={destination} progress_callback={progress_callback}"
+            )
+
+        options = kwargs  # remaining kwargs are options
+        return self._queue_downloader_wrapper_impl(task_id, url, destination, progress_callback, **options)
+
+    def _queue_downloader_wrapper_impl(self, task_id: str, url: str, destination: str,
                                 progress_callback, **options):
         """
         PHASE 9: Unified downloader wrapper using UnifiedDownloadExecutor
@@ -282,14 +317,41 @@ class UIAdapter:
                     'download_type': task.download_type  # Store for forensics
                 }
             
+            # Wrap progress callback to also update active_downloads and queue task real_filename
+            original_callback = progress_callback
+            def wrapped_progress_callback(progress_info):
+                # Update active_downloads with full progress data (filename, progress, speed)
+                self._update_download_progress(task_id, progress_info)
+                # Propagate real filename to queue task for UI table display
+                fn = progress_info.get('filename') if isinstance(progress_info, dict) else None
+                if fn and fn not in ('Preparing...', 'Queued...', ''):
+                    try:
+                        if hasattr(self, 'queue_manager') and self.queue_manager and task_id in self.queue_manager.tasks:
+                            self.queue_manager.tasks[task_id].real_filename = fn
+                    except Exception:
+                        pass
+                # Forward to original callback (queue manager's progress tracker)
+                return original_callback(progress_info)
+            
             # Execute using unified executor
-            success = self.unified_executor.execute_download(task, progress_callback)
+            success = self.unified_executor.execute_download(task, wrapped_progress_callback)
             
             # Convert to expected result format for ENGINE BASELINE v2.0 compatibility
             if success:
+                # Try to get real filename from active_downloads (set by progress callbacks)
+                # Fall back to os.path.basename(destination)
+                real_filename = None
+                with self._lock:
+                    if task_id in self.active_downloads:
+                        cb_filename = self.active_downloads[task_id].get('filename', '')
+                        if cb_filename and cb_filename not in ('Preparing...', 'Queued...', ''):
+                            real_filename = cb_filename
+                if not real_filename:
+                    real_filename = os.path.basename(destination)
+                
                 result = {
                     'status': 'success',
-                    'filename': os.path.basename(destination),
+                    'filename': real_filename,
                     'info': {
                         'mode': task.download_type,
                         'connections_used': getattr(task, 'connections_used', 1),
@@ -313,6 +375,7 @@ class UIAdapter:
                 with self._lock:
                     if task_id in self.active_downloads:
                         self.active_downloads[task_id]['status'] = 'Completed'
+                        self.active_downloads[task_id]['speed'] = ''  # Clear speed on completion
                         self.active_downloads[task_id]['filename'] = result.get('filename', 'Unknown')
                 
                 # Also update the queue task with the real filename
@@ -458,7 +521,7 @@ class UIAdapter:
             url_type = self.url_detector.detect_url_type(url)
             
             # Generate download ID (only after all preflight checks pass)
-            download_id = f"dl_{self.download_counter}"
+            download_id = f"dl_{uuid.uuid4().hex[:8]}"
             self.download_counter += 1
             
             self.logger.info(f"Starting download {download_id}: {url_type} - {url}")
@@ -568,7 +631,7 @@ class UIAdapter:
                 )
             else:
                 download_result = self.download_manager.download(
-                    url, destination, progress_callback, task_id=task_id
+                    url, destination, progress_callback, task_id=download_id
                 )
                 # Handle tuple result from download manager
                 if isinstance(download_result, tuple) and len(download_result) == 2:
@@ -597,8 +660,17 @@ class UIAdapter:
             
             if result and result.get('status') == 'success':
                 self._update_download_status(download_id, 'Completed')
+                # Prefer the live filename from progress callbacks over the result filename
+                # (result often contains os.path.basename(destination) which is the folder name)
+                live_fn = None
+                with self._lock:
+                    if download_id in self.active_downloads:
+                        live_fn = self.active_downloads[download_id].get('filename', '')
+                        if live_fn in ('Preparing...', 'Queued...', ''):
+                            live_fn = None
+                history_filename = live_fn or result.get('filename', 'Unknown')
                 # Add to history
-                self._add_to_history(download_id, result.get('filename', 'Unknown'))
+                self._add_to_history(download_id, history_filename)
             else:
                 self._update_download_status(download_id, 'Failed')
                 
@@ -678,15 +750,23 @@ class UIAdapter:
                 dl['speed'] = progress_info.get('speed', '0 B/s')
                 dl['filename'] = progress_info.get('filename', dl['filename'])
                 
-                # Update status based on progress
-                if progress_val > 0:
-                    dl['status'] = 'Downloading'
+                # Update status based on progress — but NEVER overwrite terminal states
+                current_status = dl.get('status', '')
+                terminal_states = ('Completed', 'Failed', 'Cancelled')
+                if current_status not in terminal_states:
+                    if status in ('finished', 'completed', 'done'):
+                        dl['status'] = 'Completed'
+                        dl['speed'] = ''  # Clear speed on completion
+                    elif progress_val > 0:
+                        dl['status'] = 'Downloading'
     
     def _update_download_status(self, download_id: str, status: str, error: str = None):
-        """Update download status"""
+        """Update download status (clears speed on terminal states)"""
         with self._lock:
             if download_id in self.active_downloads:
                 self.active_downloads[download_id]['status'] = status
+                if status in ('Completed', 'Failed', 'Cancelled'):
+                    self.active_downloads[download_id]['speed'] = ''
                 if error:
                     self.active_downloads[download_id]['error'] = error
     

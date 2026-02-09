@@ -28,6 +28,6 @@ if errorlevel 1 (
 
 echo.
 echo Setup completed successfully!
-echo You can now run the application with: python main.py
+echo You can now run the application with: python -m ui_qt.app
 echo.
 pause

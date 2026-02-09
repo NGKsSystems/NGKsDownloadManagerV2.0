@@ -519,6 +519,7 @@ class QueueManager:
                 elif success:
                     task.state = TaskState.COMPLETED
                     task.progress = 100.0
+                    task.speed_bps = 0.0  # Clear speed on completion
                     self._handle_task_success(task)
                     self._log_task(20, task_id, "COMPLETED", duration=f"{duration:.2f}s", 
                                   progress="100%")  # INFO

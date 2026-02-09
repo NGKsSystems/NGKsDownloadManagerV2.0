@@ -13,16 +13,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Check if main.py exists
-if not exist "main.py" (
-    echo Error: main.py not found
+:: Check if V2 UI exists
+if not exist "ui_qt\app.py" (
+    echo Error: ui_qt\app.py not found
     echo Make sure you're running this from the correct directory
     pause
     exit /b 1
 )
 
 echo Starting application...
-python main.py
+python -m ui_qt.app
 
 if errorlevel 1 (
     echo.

@@ -17,6 +17,7 @@ from PySide6.QtGui import QFont, QGuiApplication, QCursor
 # UI imports (only these allowed)
 from ui_adapter.api import get_adapter, shutdown_adapter
 from ui_adapter.events import get_event_manager, shutdown_events, UIEvent
+from ui_qt.yt_quality_dialog import YouTubeQualityDialog
 
 
 def _ensure_window_on_screen(win) -> None:
@@ -323,13 +324,14 @@ class DownloadsTab(QWidget):
         # Show options group and specific type options
         self.options_group.setVisible(True)
         
-        if url_type == "youtube":
+        url_lower = url_type.lower() if url_type else ""
+        if url_lower == "youtube":
             self.youtube_options.setVisible(True)
-        elif url_type == "huggingface": 
+        elif url_lower in ("huggingface", "hugging face"):
             self.huggingface_options.setVisible(True)
-        elif url_type == "protocol":
+        elif url_lower == "protocol":
             self.protocol_options.setVisible(True)
-        elif url_type == "http":
+        elif url_lower in ("http", "direct"):
             self.http_options.setVisible(True)
     
     def _hide_all_options(self):
@@ -436,18 +438,21 @@ class DownloadsTab(QWidget):
         
         if result.get('valid', False):
             url_type = result['type']
+            url_lower = url_type.lower() if url_type else ""
             
-            if url_type == "youtube" and self.youtube_options.isVisible():
-                options['extract_audio'] = self.extract_audio_checkbox.isChecked()
-                options['quality'] = self.quality_combo.currentText()
-                options['auto_quality'] = self.quality_combo.currentText() == "best"
+            if url_lower == "youtube":
+                # Show upgraded quality-selection popup
+                dlg = YouTubeQualityDialog(self)
+                if dlg.exec() != YouTubeQualityDialog.Accepted:
+                    return  # user cancelled
+                options.update(dlg.get_options())
                 
-            elif url_type == "huggingface" and self.huggingface_options.isVisible():
+            elif url_lower in ("huggingface", "hugging face") and self.huggingface_options.isVisible():
                 token = self.hf_token_entry.text().strip()
                 if token:
                     options['token'] = token
                     
-            elif url_type == "protocol" and self.protocol_options.isVisible():
+            elif url_lower == "protocol" and self.protocol_options.isVisible():
                 username = self.username_entry.text().strip()
                 password = self.password_entry.text().strip()
                 if username:
@@ -455,7 +460,7 @@ class DownloadsTab(QWidget):
                 if password:
                     options['password'] = password
                     
-            elif url_type == "http" and self.http_options.isVisible():
+            elif url_lower in ("http", "direct") and self.http_options.isVisible():
                 options['connections'] = self.connections_spin.value()
                 chunk_text = self.chunk_size_combo.currentText()
                 chunk_kb = int(chunk_text.replace('KB', ''))
@@ -577,25 +582,34 @@ class DownloadsTab(QWidget):
             progress_item.setFlags(progress_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.downloads_table.setItem(row, 3, progress_item)
             
-            # Speed (handle both speed and speed_bps)
-            speed = download.get('speed', '0 B/s')
-            if speed == '0 B/s' and 'speed_bps' in download:
-                speed_bps = download.get('speed_bps', 0.0)
-                if speed_bps > 0:
-                    # Convert bytes/sec to readable format
-                    if speed_bps >= 1024*1024:
-                        speed = f"{speed_bps/(1024*1024):.1f} MB/s"
-                    elif speed_bps >= 1024:
-                        speed = f"{speed_bps/1024:.1f} KB/s"
-                    else:
-                        speed = f"{speed_bps:.0f} B/s"
+            # Status (handle both status and state) — resolve BEFORE speed
+            raw_status = download.get('status', download.get('state', 'Unknown'))
+            # Normalise status display: COMPLETED/completed → Completed, etc.
+            status_lower = str(raw_status).lower()
+            terminal = status_lower in ('completed', 'failed', 'cancelled')
+            status_display = status_lower.capitalize() if status_lower in ('completed','failed','cancelled','downloading','queued','starting','paused') else str(raw_status)
+            
+            # Speed (handle both speed and speed_bps) — blank for terminal states
+            if terminal:
+                speed = '\u2014'  # em-dash
+            else:
+                speed = download.get('speed', '0 B/s')
+                if speed in ('0 B/s', '') and 'speed_bps' in download:
+                    speed_bps = download.get('speed_bps', 0.0)
+                    if speed_bps and float(speed_bps) > 0:
+                        speed_bps = float(speed_bps)
+                        if speed_bps >= 1024*1024:
+                            speed = f"{speed_bps/(1024*1024):.1f} MB/s"
+                        elif speed_bps >= 1024:
+                            speed = f"{speed_bps/1024:.1f} KB/s"
+                        else:
+                            speed = f"{speed_bps:.0f} B/s"
             speed_item = QTableWidgetItem(speed)
             speed_item.setFlags(speed_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.downloads_table.setItem(row, 4, speed_item)
             
-            # Status (handle both status and state)
-            status = download.get('status', download.get('state', 'Unknown'))
-            status_item = QTableWidgetItem(str(status))
+            # Status column
+            status_item = QTableWidgetItem(status_display)
             status_item.setFlags(status_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.downloads_table.setItem(row, 5, status_item)
 

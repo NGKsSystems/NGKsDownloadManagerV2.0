@@ -138,7 +138,7 @@ class UnifiedDownloadExecutor:
                 task.task_id, task.url, task.destination, **task.get_type_specific_options()
             )
             
-            if policy_result.action != 'ALLOW':
+            if policy_result.action == 'DENY':
                 error_msg = f"Policy blocked ({policy_result.action}): {policy_result.reason}"
                 logger.error(f"POLICY_BLOCKED | {task.task_id} | {error_msg}")
                 task.error = error_msg

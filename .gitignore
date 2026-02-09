@@ -41,8 +41,15 @@ tests/dev_scratch/
 
 # Runtime logs (exclude from tracking but allow dirs to exist)
 logs/*.log
+*.log.*
+
+# ---- RUNTIME DATA (generated at runtime, never committed) ----
+logs/runtime/*.log
+logs/runtime/*.log.*
+data/runtime/
+data/download_history_v2.json
+data/queue_state.json
 
 # ---- OPERATIONAL DIRS (DO NOT IGNORE) ----
-# logs/runtime/ - operational runtime logs (if product requires shipping defaults)
-# data/runtime/ - operational runtime data (if product requires shipping defaults)
+# logs/runtime/ and data/runtime/ are generated at runtime — see patterns above
 
