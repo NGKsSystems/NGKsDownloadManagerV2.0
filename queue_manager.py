@@ -244,11 +244,15 @@ class QueueManager:
         
     def enqueue(self, task_id: str, url: str, destination: str, 
                priority: int = 5, mode: str = "auto", connections: int = 1, **type_options) -> bool:
-        """Enqueue a download task with structured logging, policy gates, and type-specific options (Phase 10.4)"""
+        """Enqueue a download task with structured logging, policy gates, and type-specific options (Phase 10.4)
+        
+        Raises:
+            ValueError: If task_id already exists (duplicate) or policy denies enqueue.
+        """
         with self.lock:
             if task_id in self.tasks:
                 self._log_task(30, task_id, "DUPLICATE ENQUEUE REJECTED", priority=priority)  # WARNING
-                return False
+                raise ValueError(f"Duplicate task ID '{task_id}' already queued")
                 
             # STEP 5: Policy Gate - Enqueue Decision
             if POLICY_ENGINE_AVAILABLE:
@@ -260,7 +264,9 @@ class QueueManager:
                     
                     if decision.action == 'DENY':
                         self._log_task(30, task_id, "POLICY_DENIED", reason=decision.reason)  # WARNING
-                        return False
+                        raise ValueError(f"Queue policy denied: {decision.reason}")
+                except ValueError:
+                    raise  # Propagate policy denial to caller
                 except Exception as e:
                     # Policy errors should not break enqueue - log and continue
                     import logging

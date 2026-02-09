@@ -539,50 +539,43 @@ class UIAdapter:
                 
                 priority = options.get('priority', self.settings.get('queue_default_priority', 5))
                 
-                try:
-                    success = self.queue_manager.enqueue(
-                        task_id=download_id,
-                        url=url,
-                        destination=destination,
-                        priority=priority,
-                        mode=options.get('mode', 'auto'),
-                        connections=options.get('connections', 1),
-                        # Phase 10.4: Pass through all type-specific options
-                        **{k: v for k, v in options.items() if k not in ['priority', 'mode', 'connections']}
-                    )
-                    
-                    if success:
-                        # Extract host for logging
-                        from urllib.parse import urlparse
-                        url_host = urlparse(url).netloc or "unknown"
-                        filename = url.split('/')[-1][:20] if '/' in url else "unknown"
-                        
-                        self.logger.info(f"QUEUE | ENQUEUE | task_id={download_id} | priority={priority} | url_host={url_host}")
-                        self.logger.info(f"TASK_ADDED | {download_id} | {filename} | priority={priority}")
-                        self._auto_save_logs_on_completion()
-                        
-                        # Store minimal metadata for UI tracking (queue handles the rest)
-                        self.active_downloads[download_id] = {
-                            'url': url,
-                            'url_type': url_type,
-                            'destination': destination,
-                            'filename': 'Queued...',
-                            'progress': 0.0,
-                            'speed': '0 B/s',
-                            'status': 'Queued',
-                            'options': options or {},
-                            'start_time': time.time()
-                        }
-                        
-                        return download_id
-                    else:
-                        self.logger.error(f"Failed to enqueue download {download_id}: queue returned False")
-                        # Fall through to direct download
-                except Exception as e:
-                    self.logger.error(f"Failed to enqueue download {download_id}: {e}")
-                    # Fall through to direct download
+                # enqueue() raises ValueError on duplicate/policy denial — let it propagate
+                self.queue_manager.enqueue(
+                    task_id=download_id,
+                    url=url,
+                    destination=destination,
+                    priority=priority,
+                    mode=options.get('mode', 'auto'),
+                    connections=options.get('connections', 1),
+                    # Phase 10.4: Pass through all type-specific options
+                    **{k: v for k, v in options.items() if k not in ['priority', 'mode', 'connections']}
+                )
+                
+                # Extract host for logging
+                from urllib.parse import urlparse
+                url_host = urlparse(url).netloc or "unknown"
+                filename = url.split('/')[-1][:20] if '/' in url else "unknown"
+                
+                self.logger.info(f"QUEUE | ENQUEUE | task_id={download_id} | priority={priority} | url_host={url_host}")
+                self.logger.info(f"TASK_ADDED | {download_id} | {filename} | priority={priority}")
+                self._auto_save_logs_on_completion()
+                
+                # Store minimal metadata for UI tracking (queue handles the rest)
+                self.active_downloads[download_id] = {
+                    'url': url,
+                    'url_type': url_type,
+                    'destination': destination,
+                    'filename': 'Queued...',
+                    'progress': 0.0,
+                    'speed': '0 B/s',
+                    'status': 'Queued',
+                    'options': options or {},
+                    'start_time': time.time()
+                }
+                
+                return download_id
             
-            # Direct download (no queue or queue failed)
+            # Direct download (queue genuinely disabled)
             self.logger.info(f"DIRECT DOWNLOAD | queue_enabled=false task_id={download_id}")
             # Store download metadata
             self.active_downloads[download_id] = {
