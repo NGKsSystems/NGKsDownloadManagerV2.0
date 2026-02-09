@@ -390,12 +390,20 @@ class YouTubeDownloader:
             speed = d.get("speed", 0) or 0
             speed_str = self._format_size(speed) + "/s" if speed else "0 B/s"
 
-            self.current_callback({
+            # Pass raw yt-dlp dict with additional fields for enhanced progress parsing
+            progress_info = {
                 "filename": filename_display,
-                "progress": progress_str,
+                "progress": progress_str,  # Keep for compatibility
                 "speed": speed_str,
                 "status": "Downloading",
-            })
+                # Add raw yt-dlp fields for byte-based progress calculation
+                "percent": progress_str,
+                "downloaded_bytes": downloaded_bytes,
+                "total_bytes": d.get("total_bytes"),
+                "total_bytes_estimate": d.get("total_bytes_estimate")
+            }
+            
+            self.current_callback(progress_info)
 
         elif d.get("status") == "finished":
             self.current_callback({

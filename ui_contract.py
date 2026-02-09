@@ -57,6 +57,23 @@ def build_task_snapshot(task) -> Dict[str, Any]:
     Returns:
         Dictionary containing all required fields for UI
     """
+    # Use real filename if available, otherwise extract from URL
+    real_filename = getattr(task, 'real_filename', None)
+    if not real_filename and hasattr(task, 'url'):
+        url = task.url
+        # Extract meaningful filename from URL
+        if any(domain in url for domain in ['youtu.be', 'youtube.com', 'twitter.com', 'instagram.com', 'tiktok.com']):
+            if 'youtu.be/' in url:
+                video_id = url.split('youtu.be/')[-1].split('?')[0]
+                real_filename = f"Video_{video_id[:11]}"
+            elif 'youtube.com/watch' in url:
+                video_id = url.split('v=')[-1].split('&')[0] if 'v=' in url else 'unknown'
+                real_filename = f"Video_{video_id[:11]}"
+            else:
+                real_filename = "Social_Media_Video"
+        else:
+            real_filename = url.split('/')[-1].split('?')[0] or 'Unknown'
+    
     snapshot = {
         'task_id': task.task_id,
         'url': task.url,
@@ -71,7 +88,10 @@ def build_task_snapshot(task) -> Dict[str, Any]:
         'attempt': getattr(task, 'attempt', 1),
         'max_attempts': getattr(task, 'max_attempts', 1),
         'host': getattr(task, 'host', ""),
-        'effective_priority': getattr(task, 'effective_priority', task.priority)
+        'effective_priority': getattr(task, 'effective_priority', task.priority),
+        # Add computed fields for UI compatibility
+        'filename': real_filename or 'Processing...',
+        'url_type': 'YouTube' if any(domain in task.url for domain in ['youtu.be', 'youtube.com']) else 'Unknown'
     }
     
     # Validate before returning

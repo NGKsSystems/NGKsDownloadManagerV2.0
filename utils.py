@@ -212,31 +212,63 @@ class ConfigManager:
 
 
 class HistoryManager:
-    """Manage download history"""
+    """Manage V2 download history - separate from V1"""
     
-    def __init__(self, history_file="download_history.json"):
+    def __init__(self, history_file="data/download_history_v2.json"):
         self.history_file = history_file
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(history_file), exist_ok=True)
     
     def add_download(self, download_info):
-        """Add download to history"""
+        """Add download to V2 history with deduplication within V2 only"""
         try:
             history = self.load_history()
             
-            # Add timestamp
-            download_info['timestamp'] = int(time.time())
-            download_info['date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # Add timestamp if not present
+            if 'timestamp' not in download_info or download_info['timestamp'] is None:
+                download_info['timestamp'] = int(time.time())
             
-            history.append(download_info)
+            # Create V2 history entry (native format)
+            v2_entry = {
+                'url': download_info.get('url', ''),
+                'filename': download_info.get('filename', 'Unknown'),
+                'url_type': download_info.get('url_type', 'Unknown'),  # V2 uses url_type
+                'destination': download_info.get('destination', ''),
+                'status': download_info.get('status', 'Completed'),
+                'file_size': download_info.get('file_size', 0),
+                'timestamp': download_info['timestamp'],
+                'download_time': datetime.fromtimestamp(download_info['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+            }
             
-            # Keep only last 1000 entries
-            if len(history) > 1000:
-                history = history[-1000:]
+            # Deduplication within V2 history only (within 10 seconds)
+            current_time = v2_entry['timestamp']
+            is_duplicate = False
             
-            self.save_history(history)
-            return True
+            for existing in reversed(history[-20:]):  # Check last 20 V2 entries
+                time_diff = abs(current_time - existing.get('timestamp', 0))
+                if (time_diff < 10 and  # Within 10 seconds
+                    existing.get('url') == v2_entry['url'] and
+                    existing.get('filename') == v2_entry['filename'] and
+                    existing.get('destination') == v2_entry['destination'] and
+                    existing.get('status') == v2_entry['status']):
+                    is_duplicate = True
+                    break
+            
+            if not is_duplicate:
+                history.append(v2_entry)
+                
+                # Keep only last 1000 entries
+                if len(history) > 1000:
+                    history = history[-1000:]
+                
+                self.save_history(history)
+                return True
+            else:
+                print(f"Duplicate V2 history entry skipped: {v2_entry['filename']}")
+                return True  # Not an error, just a skip
             
         except Exception as e:
-            print(f"Error adding to history: {e}")
+            print(f"Error adding to V2 history: {e}")
             return False
     
     def load_history(self):
@@ -250,6 +282,10 @@ class HistoryManager:
         except Exception as e:
             print(f"Error loading history: {e}")
             return []
+    
+    def get_history(self):
+        """Get download history (alias for load_history for UI compatibility)"""
+        return self.load_history()
     
     def save_history(self, history):
         """Save download history"""

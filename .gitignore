@@ -31,3 +31,9 @@ logs/
 
 cache/
 config/
+exports/
+
+logs_archive/
+tests/dev_scratch/
+.history/
+

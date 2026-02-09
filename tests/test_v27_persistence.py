@@ -45,7 +45,14 @@ class TestPersistence:
         print("Running Test A: Save/Load round-trip schema validation")
         
         # Create queue manager
-        queue_mgr = QueueManager(max_active_downloads=2, persist_queue=True)
+        state_path = os.path.join(self.temp_dir, "roundtrip_state.json")
+        try:
+            if os.path.exists(state_path):
+                os.remove(state_path)
+        except Exception:
+            pass
+
+        queue_mgr = QueueManager(max_active_downloads=2, persist_queue=True, queue_state_path=state_path)
         
         # Add various tasks with different states
         test_states = [
@@ -118,7 +125,14 @@ class TestPersistence:
             ("completed_task", TaskState.COMPLETED)
         ]
         
-        queue_mgr = QueueManager(max_active_downloads=2, persist_queue=True)
+        state_path = os.path.join(self.temp_dir, "crash_recovery_state.json")
+        try:
+            if os.path.exists(state_path):
+                os.remove(state_path)
+        except Exception:
+            pass
+
+        queue_mgr = QueueManager(max_active_downloads=2, persist_queue=True, queue_state_path=state_path)
         
         for task_id, state in test_states:
             queue_mgr.enqueue(task_id, f"http://example.com/{task_id}", f"/tmp/{task_id}")
@@ -157,8 +171,20 @@ class TestPersistence:
     def test_no_duplicate_task_restore(self):
         """Test C: No duplicate task restore"""
         print("Running Test C: No duplicate task restore")
-        
-        queue_mgr = QueueManager(max_active_downloads=2, persist_queue=True)
+
+        # Save state
+        state_path = os.path.join(self.temp_dir, "duplicate_test.json")
+        try:
+            if os.path.exists(state_path):
+                os.remove(state_path)
+        except Exception:
+            pass
+
+        queue_mgr = QueueManager(
+            max_active_downloads=2,
+            persist_queue=True,
+            queue_state_path=state_path,
+        )
         
         # Add tasks
         task_ids = ["unique1", "unique2", "unique3"]
@@ -166,7 +192,6 @@ class TestPersistence:
             queue_mgr.enqueue(task_id, f"http://example.com/{task_id}", f"/tmp/{task_id}")
         
         # Save state
-        state_path = os.path.join(self.temp_dir, "duplicate_test.json")
         save_queue_state(queue_mgr, state_path)
         
         # Restore first time

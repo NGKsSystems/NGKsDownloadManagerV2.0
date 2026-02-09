@@ -1,0 +1,37 @@
+ENGINE BASELINE v2.0 - STEP A4 VERIFICATION EVIDENCE
+========================================================
+Date: February 5, 2026 18:22:43 - 18:22:55
+Test URL: https://httpbin.org/bytes/102400
+File Size: 102400 bytes (100KB)
+Duration: 11.85 seconds
+
+STEP 1 - HASH VERIFICATION INTEGRITY GATE:
+-------------------------------------------
+✅ HASH | START | download_efe75b65 | verifying SHA256 | temp=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65.part
+✅ HASH | FINAL_OK | download_efe75b65 | sha256=7d0740e19fff302c... | temp=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65.part
+
+STEP 2 - ATOMIC FILE HANDLING INTEGRITY GATE:
+---------------------------------------------
+✅ ATOMIC | START | temp_file=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65.part final_file=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65
+✅ ATOMIC | COMMIT_OK | temp_file=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65.part final_file=C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65
+
+QUEUE SYSTEM VERIFICATION:
+--------------------------
+✅ TASK dl_0 | CREATED | priority=5 | url=https://httpbin.org/bytes/102400 | mode=auto | connections=1 | queue_size=1
+✅ TASK dl_0 | STARTED | priority=5 | attempt=1 | worker=Thread-2 (_worker_thread) | active_count=1
+✅ TASK dl_0 | DOWNLOAD_COMPLETE | success=True
+✅ TASK dl_0 | COMPLETED | duration=11.85s | progress=100%
+
+DOWNLOAD MANAGER CONFIRMATION:
+------------------------------
+✅ Download starting: https://httpbin.org/bytes/102400 -> C:\Users\suppo/Downloads/NGK_Downloads\download_efe75b65
+✅ Download completed: mode=single, connections=1, size=102400, time=10.14s
+
+ENGINE COMPONENTS VERIFIED:
+---------------------------
+✅ integrated_multi_downloader.py - ATOMIC and HASH integrity gates working
+✅ download_manager.py - Basic download engine working  
+✅ queue_manager.py - Task scheduling and lifecycle management working
+✅ ui_adapter/api.py - Queue integration and task management working
+
+RESULT: STEP 1 + STEP 2 ENGINE INTEGRITY GATES CONFIRMED OPERATIONAL
