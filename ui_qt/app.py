@@ -176,6 +176,29 @@ def main():
         
         logger.info("UI launched successfully - entering event loop")
         
+        # Deferred yt-dlp freshness check (non-blocking, after event loop starts)
+        from PySide6.QtCore import QTimer
+        def _ytdlp_startup_check():
+            try:
+                from ytdlp_manager import check_ytdlp_freshness
+                from PySide6.QtWidgets import QMessageBox
+
+                def _prompt(current, latest):
+                    reply = QMessageBox.question(
+                        window, "yt-dlp Update Available",
+                        f"yt-dlp {current} → {latest}\n\nUpdate now?",
+                        QMessageBox.Yes | QMessageBox.No,
+                        QMessageBox.No,
+                    )
+                    return reply == QMessageBox.Yes
+
+                result = check_ytdlp_freshness(prompt_fn=_prompt)
+                logger.info(f"yt-dlp freshness check: {result}")
+            except Exception as e:
+                logger.warning(f"yt-dlp startup check failed (non-fatal): {e}")
+
+        QTimer.singleShot(2000, _ytdlp_startup_check)
+        
         # Run event loop
         exit_code = app.exec()
         

@@ -8,6 +8,8 @@ Usage:
   python ngks_dl_cli.py batch import  --xlsx <file> --out <batch.json>
   python ngks_dl_cli.py batch validate --file <batch.json>
   python ngks_dl_cli.py batch run     --file <batch.json> [--report <path>]
+  python ngks_dl_cli.py ytdlp check
+  python ngks_dl_cli.py ytdlp update [--yes]
   python ngks_dl_cli.py version
 """
 

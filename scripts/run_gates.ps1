@@ -101,6 +101,7 @@ Run-Test "F5" "& '$PY' tests\test_f5_batch_import_and_run.py" "f5_output.txt" $f
 Run-Test "F6" "& '$PY' tests\test_f6_ship_readiness.py" "f6_output.txt" $false
 Run-Test "F7" "& '$PY' tests\test_f7_security_hardening.py" "f7_output.txt" $false
 Run-Test "F8" "& '$PY' tests\test_f8_ytdlp_manager.py" "f8_output.txt" $false
+Run-Test "F9" "& '$PY' tests\test_f9_integration_polish.py" "f9_output.txt" $false
 
 Write-Host "ALL REQUIRED GATES PASS (legacy gates promoted to blocking after reconciliation)."
 exit 0

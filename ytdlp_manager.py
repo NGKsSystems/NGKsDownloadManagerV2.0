@@ -47,6 +47,31 @@ def _get_binary_asset_name() -> str:
     return "yt-dlp_linux"
 
 
+def resolve_install_dir() -> str:
+    """Return the single, app-owned directory where yt-dlp binary lives.
+
+    Strategy:
+      - Dev / venv mode (``sys.prefix != sys.base_prefix``): ``<repo>/bin/``
+      - Packaged / system mode: ``%LOCALAPPDATA%/NGKsDL/bin/`` (Windows)
+        or ``~/.local/share/ngksdl/bin/`` (POSIX)
+
+    The directory is created if it doesn't exist.
+    """
+    if sys.prefix != sys.base_prefix:
+        # Dev / venv — use repo-relative bin/
+        base = os.path.dirname(os.path.abspath(__file__))
+        d = os.path.join(base, "bin")
+    elif platform.system() == "Windows":
+        local = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+        d = os.path.join(local, "NGKsDL", "bin")
+    else:
+        xdg = os.environ.get("XDG_DATA_HOME", os.path.join(os.path.expanduser("~"), ".local", "share"))
+        d = os.path.join(xdg, "ngksdl", "bin")
+
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 # ---------------------------------------------------------------------------
 # Step 3: Runtime Version Detection
 # ---------------------------------------------------------------------------
@@ -87,15 +112,15 @@ def get_current_ytdlp_version() -> Optional[str]:
 def _find_controlled_binary() -> Optional[str]:
     """Find yt-dlp binary in controlled install directories only.
 
-    Does NOT search PATH — only looks in ``<project_root>/bin/``.
+    Checks resolve_install_dir() — never searches system PATH.
     """
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    bin_dir = os.path.join(project_root, "bin")
+    try:
+        bin_dir = resolve_install_dir()
+    except OSError:
+        return None
 
-    if platform.system() == "Windows":
-        candidate = os.path.join(bin_dir, "yt-dlp.exe")
-    else:
-        candidate = os.path.join(bin_dir, "yt-dlp")
+    binary_name = _get_binary_asset_name()
+    candidate = os.path.join(bin_dir, binary_name)
 
     if os.path.isfile(candidate):
         return candidate
@@ -301,8 +326,7 @@ def update_via_binary(release_info: Dict[str, Any],
     Returns ``(success, message)``.
     """
     if install_dir is None:
-        project_root = os.path.dirname(os.path.abspath(__file__))
-        install_dir = os.path.join(project_root, "bin")
+        install_dir = resolve_install_dir()
 
     os.makedirs(install_dir, exist_ok=True)
 
@@ -407,14 +431,15 @@ def check_and_prompt_cli(api_url: str = None,
     """
     current = get_current_ytdlp_version()
     if current is None:
-        print("yt-dlp is not installed.")
+        print("ERROR: yt-dlp is not installed.", file=sys.stderr)
         return 1
 
     print(f"Current yt-dlp version: {current}")
 
     latest = get_latest_ytdlp_version(api_url)
     if latest is None:
-        print("Could not check latest version (network error).")
+        print("ERROR: Could not reach update server (offline or unreachable).",
+              file=sys.stderr)
         return 1
 
     print(f"Latest yt-dlp version:  {latest}")
@@ -448,7 +473,8 @@ def check_and_prompt_cli(api_url: str = None,
     else:
         release_info = get_latest_release_info(api_url)
         if not release_info:
-            print("Failed to fetch release info.")
+            print("ERROR: Failed to fetch release info (offline or unreachable).",
+                  file=sys.stderr)
             return 1
         ok, msg = update_via_binary(release_info)
 
@@ -456,7 +482,12 @@ def check_and_prompt_cli(api_url: str = None,
         print(f"SUCCESS: {msg}")
         return 0
     else:
-        print(f"FAILED: {msg}")
+        if "hash mismatch" in msg.lower():
+            print(f"ERROR: Integrity check failed — {msg}", file=sys.stderr)
+        elif "permission" in msg.lower() or "access" in msg.lower():
+            print(f"ERROR: Permission denied — {msg}", file=sys.stderr)
+        else:
+            print(f"ERROR: Update failed — {msg}", file=sys.stderr)
         return 1
 
 
@@ -465,9 +496,48 @@ def _versions_match(current: str, latest: str) -> bool:
     return current.strip().lower() == latest.strip().lower()
 
 
-# TODO(F8-UI): On MainWindow startup, call a UI-aware version of this flow:
-#   from ytdlp_manager import get_current_ytdlp_version, get_latest_ytdlp_version
-#   if current != latest:
-#       reply = QMessageBox.question(self, "yt-dlp Update",
-#           f"Update available: {current} -> {latest}\nUpdate now?")
-#       if reply == QMessageBox.Yes: ...
+def check_ytdlp_freshness(prompt_fn=None, api_url: str = None) -> Optional[str]:
+    """Non-blocking freshness check usable from UI or tests.
+
+    *prompt_fn*: callable(current, latest) -> bool (True=update, False=skip).
+                 If None, returns the update message without prompting.
+    *api_url*:   override for testing (LocalRangeServer URL).
+
+    Returns a short status string ("up_to_date", "updated", "declined",
+    "error:<reason>") or None on unexpected failure.
+    """
+    try:
+        current = get_current_ytdlp_version()
+        if not current:
+            return "error:not_installed"
+
+        latest = get_latest_ytdlp_version(api_url)
+        if not latest:
+            return "error:offline"
+
+        if _versions_match(current, latest):
+            return "up_to_date"
+
+        log_security_event("YTDLP.UPDATE_AVAILABLE",
+                           detail=f"current={current} latest={latest}")
+
+        if prompt_fn is None:
+            return f"update_available:{current}->{latest}"
+
+        if not prompt_fn(current, latest):
+            return "declined"
+
+        env = detect_environment()
+        if env == "pip":
+            ok, msg = update_via_pip()
+        else:
+            release_info = get_latest_release_info(api_url)
+            if not release_info:
+                return "error:release_fetch"
+            ok, msg = update_via_binary(release_info)
+
+        return "updated" if ok else f"error:{msg}"
+
+    except Exception as e:
+        logger.warning(f"check_ytdlp_freshness failed: {e}")
+        return f"error:{e}"
