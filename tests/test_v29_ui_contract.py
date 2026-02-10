@@ -47,7 +47,7 @@ class TestUIContract:
         
         # Enqueue a task
         task_id = "test_task"
-        queue_mgr.enqueue(task_id, "http://example.com/test", "/tmp/test")
+        queue_mgr.enqueue(task_id, "http://127.0.0.1:19999/test", "/tmp/test")
         
         # Get task snapshot
         try:
@@ -96,7 +96,7 @@ class TestUIContract:
         
         # Enqueue task
         task_id = "test_task"
-        queue_mgr.enqueue(task_id, "http://example.com/test", "/tmp/test")
+        queue_mgr.enqueue(task_id, "http://127.0.0.1:19999/test", "/tmp/test")
         
         # Start scheduler to process task
         queue_mgr.start_scheduler()
@@ -155,7 +155,7 @@ class TestUIContract:
         
         # Enqueue task with various characters (should be ASCII-safe)
         task_id = "ascii_test"
-        url = "http://example.com/test_file.txt"  # ASCII-safe URL
+        url = "http://127.0.0.1:19999/test_file.txt"  # ASCII-safe URL
         dest = "/tmp/test_file.txt"  # ASCII-safe destination
         
         queue_mgr.enqueue(task_id, url, dest)
