@@ -28,6 +28,18 @@ class YouTubeDownloader:
         return ("twitter.com" in u) or ("x.com" in u)
 
     @staticmethod
+    def _map_quality_to_format(quality: str) -> str:
+        """Map UI quality preset to a yt-dlp format selector string."""
+        _PRESETS = {
+            "1080": "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+            "720":  "bestvideo[height<=720]+bestaudio/best[height<=720]",
+            "480":  "bestvideo[height<=480]+bestaudio/best[height<=480]",
+            "360":  "bestvideo[height<=360]+bestaudio/best[height<=360]",
+            "240":  "bestvideo[height<=240]+bestaudio/best[height<=240]",
+        }
+        return _PRESETS.get(quality, "best[height<=1080]/best")
+
+    @staticmethod
     def _is_youtube(url: str) -> bool:
         u = (url or "").lower()
         return ("youtube.com" in u) or ("youtu.be" in u)
@@ -276,7 +288,7 @@ class YouTubeDownloader:
             if extract_audio:
                 # For audio-only downloads
                 ydl_opts.update({
-                    "format": "bestaudio/best",
+                    "format": "bestaudio[ext=m4a]/bestaudio/best",
                     "postprocessors": [{
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": "mp3",
@@ -288,7 +300,13 @@ class YouTubeDownloader:
                 if auto_quality:
                     ydl_opts["format"] = "best[height<=1080]/best"
                 else:
-                    ydl_opts["format"] = quality
+                    ydl_opts["format"] = self._map_quality_to_format(quality)
+
+            import logging
+            logging.getLogger("youtube_downloader").info(
+                f"YT.FORMAT.SELECTED | quality={quality} | auto_quality={auto_quality}"
+                f" | extract_audio={extract_audio} | format={ydl_opts['format']}"
+            )
 
             self.current_callback = progress_callback
             self.current_filename = "Preparing..."
