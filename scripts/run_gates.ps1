@@ -107,6 +107,7 @@ Run-Test "F11" "& '$PY' tests\test_f11_sha256_verify.py" "f11_output.txt" $false
 Run-Test "F12" "& '$PY' tests\test_f12_archive_safety.py" "f12_output.txt" $false
 Run-Test "F14" "& '$PY' tests\test_f14_policy_ux.py" "f14_output.txt" $false
 Run-Test "F15" "& '$PY' tests\test_f15_network_knobs.py" "f15_output.txt" $false
+Run-Test "F16" "& '$PY' tests\test_f16_forensic_report.py" "f16_output.txt" $false
 
 Write-Host "ALL REQUIRED GATES PASS (legacy gates promoted to blocking after reconciliation)."
 exit 0

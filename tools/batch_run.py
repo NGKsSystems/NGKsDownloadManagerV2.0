@@ -13,6 +13,7 @@ import signal
 import sys
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
@@ -23,11 +24,68 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from tools.batch_schema import validate_batch_dict
+from tools.forensics import (
+    git_short_rev as _git_short_rev,
+    app_version as _app_version,
+    policy_version_hash as _policy_version_hash,
+    os_platform as _os_platform,
+    python_version as _python_version,
+)
 from queue_manager import QueueManager, TaskState
 from download_manager import DownloadManager
 from security import safe_join, sanitize_filename, PathTraversalError, choose_final_dir, log_security_event
 
 logger = logging.getLogger("batch_run")
+
+
+# ---------------------------------------------------------------------------
+# F16: Forensics metadata helpers
+# ---------------------------------------------------------------------------
+
+
+def _extract_host(url: str) -> str:
+    from urllib.parse import urlparse
+    try:
+        return (urlparse(url).hostname or "").lower() or "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _classify_failure(state: str, error: str | None) -> str:
+    """Return a short failure category string."""
+    if state == "COMPLETED":
+        return "none"
+    if state == "DENIED":
+        return "policy_denied"
+    if not error:
+        return "unknown"
+    el = error.lower()
+    if "hash_mismatch" in el:
+        return "hash_mismatch"
+    if "timeout" in el:
+        return "timeout"
+    if "connection" in el or "network" in el:
+        return "network_error"
+    return "download_error"
+
+
+def build_log_folder(base: str, mode: str, summary: Dict[str, int],
+                     short_id: str = "") -> str:
+    """Build a human-readable log folder path:
+    YYYY-MM-DD/HHMMSS - <mode> - <summary> - <shortid>/
+    """
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    time_str = now.strftime("%H%M%S")
+    c = summary.get("completed", 0)
+    f = summary.get("failed", 0) + summary.get("denied", 0)
+    if f == 0:
+        tag = f"{c}ok"
+    else:
+        tag = f"{c}ok_{f}fail"
+    sid = short_id or uuid.uuid4().hex[:8]
+    folder_name = f"{time_str} - {mode} - {tag} - {sid}"
+    return os.path.join(base, date_str, folder_name)
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +161,7 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             denied_items.append({
                 "task_id": item["id"],
                 "url": item["url"],
+                "host": _extract_host(item["url"]),
                 "final_path": raw_filename,
                 "state": "DENIED",
                 "bytes_total": 0,
@@ -110,6 +169,7 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
                 "started_at": now_utc,
                 "ended_at": now_utc,
                 "error": f"path traversal blocked: {e}",
+                "failure_category": "policy_denied",
                 "quarantined": quarantined,
                 "quarantine_reason": "dangerous_extension" if quarantined else None,
             })
@@ -151,6 +211,7 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             denied_items.append({
                 "task_id": item["id"],
                 "url": item["url"],
+                "host": _extract_host(item["url"]),
                 "final_path": dest,
                 "state": "DENIED",
                 "bytes_total": 0,
@@ -158,6 +219,7 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
                 "started_at": now_utc,
                 "ended_at": now_utc,
                 "error": str(e),
+                "failure_category": "policy_denied",
                 "quarantined": quarantined,
                 "quarantine_reason": "dangerous_extension" if quarantined else None,
             })
@@ -249,9 +311,11 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
 
         qmeta = _quarantine_map.get(tid, {})
         expected_sha = _expected_sha256.get(tid)
+        task_url = task_dict["url"]
         results.append({
             "task_id": tid,
-            "url": task_dict["url"],
+            "url": task_url,
+            "host": _extract_host(task_url),
             "final_path": dest,
             "state": state,
             "bytes_total": file_size,
@@ -262,6 +326,7 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             "started_at": task_dict.get("created_at", now_utc),
             "ended_at": task_dict.get("updated_at", now_utc),
             "error": error,
+            "failure_category": _classify_failure(state, error),
             "quarantined": qmeta.get("quarantined", False),
             "quarantine_reason": qmeta.get("quarantine_reason"),
         })
@@ -279,16 +344,40 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
     report = {
         "run_id": now_utc,
         "mode": "batch",
+        "app_version": _app_version(),
+        "git_rev": _git_short_rev(),
+        "policy_version_hash": _policy_version_hash(),
+        "os": _os_platform(),
+        "python_version": _python_version(),
         "results": results,
         "summary": summary,
     }
 
-    # --- Write report ---
+    # --- Write report + session log folder ---
+    log_dir = build_log_folder(
+        os.path.join(_PROJECT_ROOT, "logs"),
+        "batch", summary,
+    )
+    os.makedirs(log_dir, exist_ok=True)
+    session_meta = {
+        "run_id": report["run_id"],
+        "app_version": report["app_version"],
+        "git_rev": report["git_rev"],
+        "policy_version_hash": report["policy_version_hash"],
+        "os": report["os"],
+        "python_version": report["python_version"],
+        "summary": summary,
+    }
+    meta_path = os.path.join(log_dir, "session_meta.json")
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(session_meta, f, indent=2)
+
     if report_path:
         os.makedirs(os.path.dirname(os.path.abspath(report_path)), exist_ok=True)
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         logger.info(f"BATCH | REPORT | path={report_path}")
+    logger.info(f"BATCH | LOG_DIR | path={log_dir}")
 
     # Print summary
     print(f"BATCH COMPLETE | completed={summary['completed']} failed={summary['failed']} "
