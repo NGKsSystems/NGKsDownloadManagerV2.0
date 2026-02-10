@@ -98,14 +98,29 @@ def cmd_batch_run(args):
 
 
 def cmd_version(args):
-    """Print version"""
+    """Print version + git short hash (if available)."""
     version_file = os.path.join(_PROJECT_ROOT, "VERSION")
     if os.path.exists(version_file):
         with open(version_file) as f:
             ver = f.read().strip()
     else:
         ver = "unknown"
-    print(f"NGKs Download Manager v{ver}")
+
+    # Try to get git short hash
+    git_rev = ""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+            cwd=_PROJECT_ROOT,
+        )
+        if result.returncode == 0:
+            git_rev = f" (git {result.stdout.strip()})"
+    except Exception:
+        pass
+
+    print(f"NGKs Download Manager v{ver}{git_rev}")
 
 
 def cmd_ytdlp_check(args):
