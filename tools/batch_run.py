@@ -25,7 +25,7 @@ if _PROJECT_ROOT not in sys.path:
 from tools.batch_schema import validate_batch_dict
 from queue_manager import QueueManager, TaskState
 from download_manager import DownloadManager
-from security import safe_join, sanitize_filename, PathTraversalError, choose_final_dir
+from security import safe_join, sanitize_filename, PathTraversalError, choose_final_dir, log_security_event
 
 logger = logging.getLogger("batch_run")
 
@@ -86,6 +86,7 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
     # --- Merge defaults + enqueue ---
     denied_items: List[Dict[str, Any]] = []
     _quarantine_map: Dict[str, Dict[str, Any]] = {}
+    _expected_sha256: Dict[str, str] = {}  # task_id -> normalized lowercase hex
 
     for item in items:
         dest_dir = item.get("dest_dir") or defaults.get("dest_dir") or "downloads"
@@ -123,6 +124,10 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             "quarantined": quarantined,
             "quarantine_reason": "dangerous_extension" if quarantined else None,
         }
+        # F11: store expected sha256 if provided
+        item_sha = item.get("sha256")
+        if item_sha:
+            _expected_sha256[item["id"]] = item_sha.lower()
 
         try:
             qm.enqueue(
@@ -212,12 +217,38 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
         dest = task_dict["destination"]
         sha = None
         file_size = 0
+        hash_result = "NONE"
+        error = task_dict.get("error")
 
         if state == "COMPLETED" and os.path.exists(dest):
             sha = _sha256_file(dest)
             file_size = os.path.getsize(dest)
 
+            # F11: sha256 verification if expected hash was provided
+            expected = _expected_sha256.get(tid)
+            if expected:
+                if sha == expected:
+                    hash_result = "OK"
+                else:
+                    hash_result = "MISMATCH"
+                    state = "FAILED"
+                    error = f"HASH_MISMATCH: expected={expected} actual={sha}"
+                    log_security_event("HASH_MISMATCH",
+                                       task_id=tid,
+                                       final_path=dest,
+                                       detail=f"expected={expected} actual={sha}",
+                                       decision="DENY")
+                    # Remove the file — do not leave mismatched content
+                    try:
+                        os.unlink(dest)
+                    except OSError:
+                        pass
+                    file_size = 0
+            elif sha:
+                hash_result = "UNCHECKED"
+
         qmeta = _quarantine_map.get(tid, {})
+        expected_sha = _expected_sha256.get(tid)
         results.append({
             "task_id": tid,
             "url": task_dict["url"],
@@ -226,9 +257,11 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             "bytes_total": file_size,
             "bytes_downloaded": file_size if state == "COMPLETED" else 0,
             "sha256": sha,
+            "expected_sha256": expected_sha,
+            "hash_result": hash_result,
             "started_at": task_dict.get("created_at", now_utc),
             "ended_at": task_dict.get("updated_at", now_utc),
-            "error": task_dict.get("error"),
+            "error": error,
             "quarantined": qmeta.get("quarantined", False),
             "quarantine_reason": qmeta.get("quarantine_reason"),
         })

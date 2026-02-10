@@ -15,7 +15,7 @@ _BATCH_TOPLEVEL_KEYS = {"batch_id", "defaults", "items"}
 _DEFAULTS_KEYS = {"dest_dir", "connections", "priority"}
 
 # Allowed keys inside each item
-_ITEM_KEYS = {"id", "url", "filename", "dest_dir", "connections", "priority", "headers", "tags"}
+_ITEM_KEYS = {"id", "url", "filename", "dest_dir", "connections", "priority", "headers", "tags", "sha256"}
 
 # Required keys inside each item
 _ITEM_REQUIRED = {"id", "url"}
@@ -132,5 +132,12 @@ def validate_batch_dict(batch: Dict[str, Any]) -> List[str]:
             v = item["dest_dir"]
             if not isinstance(v, str) or not v.strip():
                 errors.append(f"{prefix}: dest_dir must be a non-empty string")
+
+        if "sha256" in item:
+            v = item["sha256"]
+            if not isinstance(v, str) or len(v) != 64:
+                errors.append(f"{prefix}: sha256 must be a 64-character hex string")
+            elif not all(c in '0123456789abcdefABCDEF' for c in v):
+                errors.append(f"{prefix}: sha256 must contain only hex characters")
 
     return errors
