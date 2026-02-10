@@ -54,3 +54,7 @@ data/queue_state.json
 # ---- OPERATIONAL DIRS (DO NOT IGNORE) ----
 # logs/runtime/ and data/runtime/ are generated at runtime — see patterns above
 
+
+# local forensic archive
+_orphan_archive/
+
