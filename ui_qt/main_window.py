@@ -440,12 +440,13 @@ class DownloadsTab(QWidget):
             url_type = result['type']
             url_lower = url_type.lower() if url_type else ""
             
-            if url_lower == "youtube":
-                # Show upgraded quality-selection popup
-                dlg = YouTubeQualityDialog(self)
-                if dlg.exec() != YouTubeQualityDialog.Accepted:
-                    return  # user cancelled
-                options.update(dlg.get_options())
+            if url_lower == "youtube" and self.youtube_options.isVisible():
+                # Read from inline YouTube options panel
+                quality = self.quality_combo.currentText()
+                options['auto_quality'] = (quality == "best")
+                if quality != "best":
+                    options['quality'] = quality
+                options['extract_audio'] = self.extract_audio_checkbox.isChecked()
                 
             elif url_lower in ("huggingface", "hugging face") and self.huggingface_options.isVisible():
                 token = self.hf_token_entry.text().strip()
