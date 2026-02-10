@@ -613,7 +613,8 @@ class UIAdapter:
                 result = self.youtube_downloader.download(
                     url, destination, progress_callback,
                     extract_audio=options.get('extract_audio', False),
-                    auto_quality=options.get('auto_quality', True)
+                    auto_quality=options.get('auto_quality', True),
+                    quality=options.get('quality', 'best')
                 )
             elif url_type == "Hugging Face":
                 if not self.hf_downloader:
