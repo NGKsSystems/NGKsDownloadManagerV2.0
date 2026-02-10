@@ -18,6 +18,9 @@ from pathlib import Path
 # Import policy engine
 from policy_engine import PolicyEngine
 
+# F7: Security hardening
+from security import safe_join, sanitize_filename, warn_if_executable, PathTraversalError
+
 # Module-level logger
 logger = logging.getLogger(__name__)
 
@@ -197,10 +200,17 @@ class DownloadManager:
         parsed_url = urlparse(url)
         if os.path.isdir(destination):
             filename = self._get_filename_from_url(url)
-            filepath = os.path.join(destination, filename)
+            # F7: path containment -- filename must stay inside destination
+            filepath = safe_join(destination, filename)
         else:
             filepath = destination
             filename = os.path.basename(filepath)
+        
+        # F7: sanitize the filename component
+        clean_name = sanitize_filename(filename)
+        if clean_name != filename:
+            filepath = os.path.join(os.path.dirname(filepath), clean_name)
+            filename = clean_name
         
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -400,6 +410,9 @@ class DownloadManager:
                 try:
                     os.replace(temp_filepath, filepath)
                     logger.info(f"ATOMIC | COMMIT_OK | final={filepath}")
+                    
+                    # F7: executable delivery warning (post-finalization, non-blocking)
+                    warn_if_executable(filepath, task_id=task_id, url=url)
                     
                     # Clean up resume state after successful completion
                     self._cleanup_resume_state(filepath, task_id)

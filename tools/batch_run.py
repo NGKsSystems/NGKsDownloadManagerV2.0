@@ -25,6 +25,7 @@ if _PROJECT_ROOT not in sys.path:
 from tools.batch_schema import validate_batch_dict
 from queue_manager import QueueManager, TaskState
 from download_manager import DownloadManager
+from security import safe_join, sanitize_filename, PathTraversalError
 
 logger = logging.getLogger("batch_run")
 
@@ -87,8 +88,26 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
 
     for item in items:
         dest_dir = item.get("dest_dir") or defaults.get("dest_dir") or "downloads"
-        filename = item.get("filename") or item["url"].rstrip("/").split("/")[-1] or "download"
-        dest = os.path.join(dest_dir, filename)
+        raw_filename = item.get("filename") or item["url"].rstrip("/").split("/")[-1] or "download"
+        # F7: sanitize filename + path containment
+        filename = sanitize_filename(raw_filename)
+        try:
+            dest = safe_join(dest_dir, filename)
+        except PathTraversalError as e:
+            logger.warning(f"BATCH | DENIED | id={item['id']} | reason=path_traversal: {e}")
+            print(f"DENIED: {item['id']} -- path traversal blocked: {e}", file=sys.stderr)
+            denied_items.append({
+                "task_id": item["id"],
+                "url": item["url"],
+                "final_path": raw_filename,
+                "state": "DENIED",
+                "bytes_total": 0,
+                "bytes_downloaded": 0,
+                "started_at": now_utc,
+                "ended_at": now_utc,
+                "error": f"path traversal blocked: {e}",
+            })
+            continue
         os.makedirs(dest_dir, exist_ok=True)
 
         priority = item.get("priority") or defaults.get("priority") or 5
