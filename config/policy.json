@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "schema_version": 1,
+  "last_updated": "2026-02-09T16:21:39.532593",
+  "policies": {
+    "global": {
+      "safe_mode": false,
+      "offline_mode": false,
+      "metered_network_restrictions": false
+    },
+    "per_task": {
+      "max_speed_bps": null,
+      "max_retries": null,
+      "timeout_seconds": 300
+    },
+    "per_host": {
+      "allowlist": [],
+      "denylist": [
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "example.com"
+      ],
+      "max_connections_per_host": 2,
+      "rate_limit_requests_per_minute": null
+    },
+    "file_type": {
+      "allowed_extensions": [],
+      "blocked_extensions": [
+        ".exe",
+        ".bat",
+        ".cmd",
+        ".scr"
+      ],
+      "max_file_size_mb": null
+    }
+  }
+}
