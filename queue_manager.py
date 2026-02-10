@@ -738,10 +738,11 @@ class QueueManager:
                 raise RuntimeError(f"Queue persistence failed: {e}")
     
     def _extract_host(self, url: str) -> Optional[str]:
-        """Extract hostname from URL"""
+        """Extract hostname from URL (strips port)"""
         try:
             parsed = urlparse(url)
-            return parsed.netloc.lower() if parsed.netloc else None
+            hostname = (parsed.hostname or "").lower()
+            return hostname if hostname else None
         except Exception:
             return None
     

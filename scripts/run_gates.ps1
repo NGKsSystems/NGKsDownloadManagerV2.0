@@ -98,6 +98,7 @@ Run-Test "V2.8" "& '$PY' tests\test_v28_execution_policy.py" "v28_output.txt" $f
 Run-Test "V2.9" "& '$PY' tests\test_v29_ui_contract.py" "v29_output.txt" $false
 Run-Test "HIST" "& '$PY' tools\gates\gate_history_paths.py" "hist_output.txt" $false
 Run-Test "F5" "& '$PY' tests\test_f5_batch_import_and_run.py" "f5_output.txt" $false
+Run-Test "F6" "& '$PY' tests\test_f6_ship_readiness.py" "f6_output.txt" $false
 
 Write-Host "ALL REQUIRED GATES PASS (legacy gates promoted to blocking after reconciliation)."
 exit 0

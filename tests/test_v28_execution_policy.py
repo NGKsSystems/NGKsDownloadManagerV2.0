@@ -15,6 +15,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from queue_manager import QueueManager, TaskState
 from local_range_server import LocalRangeServer
 
+# F6: whitelist loopback for test-local servers (policy now uses hostname, not netloc)
+_LOOPBACK = {'localhost', '127.0.0.1', '::1'}
+try:
+    from policy_engine import get_policy_engine as _get_pe
+    _pe = _get_pe()
+    _orig_denylist_v28 = list(_pe.policies.get('per_host', {}).get('denylist', []))
+    _pe.policies.setdefault('per_host', {})['denylist'] = [
+        h for h in _orig_denylist_v28 if h not in _LOOPBACK
+    ]
+except Exception:
+    _pe = None
+    _orig_denylist_v28 = None
+
 
 class TestExecutionPolicy:
     
@@ -378,6 +391,14 @@ def test_execution_policy_suite():
         return False
 
 
+def _restore_denylist():
+    if _pe is not None and _orig_denylist_v28 is not None:
+        _pe.policies['per_host']['denylist'] = _orig_denylist_v28
+
+
 if __name__ == "__main__":
-    success = test_execution_policy_suite()
-    sys.exit(0 if success else 1)
+    try:
+        success = test_execution_policy_suite()
+        sys.exit(0 if success else 1)
+    finally:
+        _restore_denylist()

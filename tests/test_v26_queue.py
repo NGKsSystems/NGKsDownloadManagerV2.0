@@ -18,6 +18,19 @@ from queue_manager import QueueManager, TaskState
 from local_range_server import LocalRangeServer
 from download_manager import DownloadManager
 
+# F6: whitelist loopback for test-local servers (policy now uses hostname, not netloc)
+_LOOPBACK = {'localhost', '127.0.0.1', '::1'}
+try:
+    from policy_engine import get_policy_engine as _get_pe
+    _pe = _get_pe()
+    _orig_denylist_v26 = list(_pe.policies.get('per_host', {}).get('denylist', []))
+    _pe.policies.setdefault('per_host', {})['denylist'] = [
+        h for h in _orig_denylist_v26 if h not in _LOOPBACK
+    ]
+except Exception:
+    _pe = None
+    _orig_denylist_v26 = None
+
 
 class TestV26Queue:
     """Test suite for V2.6 queue functionality"""
@@ -386,7 +399,15 @@ class TestV26Queue:
             return False
 
 
+def _restore_denylist():
+    if _pe is not None and _orig_denylist_v26 is not None:
+        _pe.policies['per_host']['denylist'] = _orig_denylist_v26
+
+
 if __name__ == "__main__":
     tester = TestV26Queue()
-    success = tester.run_all_tests()
-    sys.exit(0 if success else 1)
+    try:
+        success = tester.run_all_tests()
+        sys.exit(0 if success else 1)
+    finally:
+        _restore_denylist()

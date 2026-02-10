@@ -17,6 +17,24 @@ from queue_manager import QueueManager, TaskState
 from queue_persistence import save_queue_state, load_queue_state, apply_crash_recovery_rules, PersistenceError
 from local_range_server import LocalRangeServer
 
+# F6: whitelist loopback for test-local servers (policy now uses hostname, not netloc)
+_LOOPBACK = {'localhost', '127.0.0.1', '::1'}
+try:
+    from policy_engine import get_policy_engine as _get_pe
+    _pe = _get_pe()
+    _orig_denylist = list(_pe.policies.get('per_host', {}).get('denylist', []))
+    _pe.policies.setdefault('per_host', {})['denylist'] = [
+        h for h in _orig_denylist if h not in _LOOPBACK
+    ]
+except Exception:
+    _pe = None
+    _orig_denylist = None
+
+
+def _restore_denylist():
+    if _pe is not None and _orig_denylist is not None:
+        _pe.policies['per_host']['denylist'] = _orig_denylist
+
 
 class TestPersistence:
     
@@ -342,3 +360,4 @@ if __name__ == "__main__":
         sys.exit(0 if success else 1)
     finally:
         test_runner.cleanup()
+        _restore_denylist()

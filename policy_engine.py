@@ -143,10 +143,10 @@ class PolicyEngine:
         """
         self.logger.info(f"POLICY | CHECK | scope=task | rule=enqueue | task_id={task_id}")
         
-        # Extract host from URL
+        # Extract host from URL (hostname only — strips port)
         try:
             parsed_url = urlparse(url)
-            host = parsed_url.netloc.lower()
+            host = (parsed_url.hostname or "").lower() or "unknown"
         except Exception:
             host = "unknown"
         
@@ -251,10 +251,10 @@ class PolicyEngine:
         return PolicyDecision('ALLOW', 'resume_policy_passed')
     
     def _extract_host(self, url: str) -> str:
-        """Extract hostname from URL"""
+        """Extract hostname from URL (strips port)"""
         try:
             parsed_url = urlparse(url)
-            return parsed_url.netloc.lower()
+            return (parsed_url.hostname or "").lower() or "unknown"
         except Exception:
             return "unknown"
     

@@ -105,8 +105,10 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             )
             logger.info(f"BATCH | ENQUEUED | id={item['id']} | url={item['url'][:60]}")
         except ValueError as e:
-            # Policy denied or duplicate
-            logger.warning(f"BATCH | DENIED | id={item['id']} | reason={e}")
+            # Policy denied or duplicate -- clear message to stderr
+            reason = str(e)
+            logger.warning(f"BATCH | DENIED | id={item['id']} | reason={reason}")
+            print(f"DENIED: {item['id']} -- {reason}", file=sys.stderr)
             denied_items.append({
                 "task_id": item["id"],
                 "url": item["url"],
@@ -251,10 +253,17 @@ def main():
         logging.basicConfig(level=logging.WARNING, format="%(name)s: %(message)s")
 
     # Load + validate
+    if not os.path.exists(args.file):
+        print(f"ERROR: batch file not found: {args.file}", file=sys.stderr)
+        sys.exit(2)
+
     try:
         with open(args.file, "r", encoding="utf-8") as f:
             batch = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
+    except json.JSONDecodeError as e:
+        print(f"ERROR: batch file is not valid JSON: {e}", file=sys.stderr)
+        sys.exit(2)
+    except OSError as e:
         print(f"ERROR: cannot read batch file: {e}", file=sys.stderr)
         sys.exit(2)
 

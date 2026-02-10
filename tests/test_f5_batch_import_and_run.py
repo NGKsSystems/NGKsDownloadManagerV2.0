@@ -32,6 +32,24 @@ from tools.batch_schema import validate_batch_dict
 from tools.batch_import import import_csv
 from tools.batch_run import run_batch
 
+# F6: whitelist loopback for test-local servers (policy now uses hostname, not netloc)
+_LOOPBACK = {'localhost', '127.0.0.1', '::1'}
+try:
+    from policy_engine import get_policy_engine as _get_pe
+    _pe = _get_pe()
+    _orig_denylist_f5 = list(_pe.policies.get('per_host', {}).get('denylist', []))
+    _pe.policies.setdefault('per_host', {})['denylist'] = [
+        h for h in _orig_denylist_f5 if h not in _LOOPBACK
+    ]
+except Exception:
+    _pe = None
+    _orig_denylist_f5 = None
+
+
+def _restore_denylist():
+    if _pe is not None and _orig_denylist_f5 is not None:
+        _pe.policies['per_host']['denylist'] = _orig_denylist_f5
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -171,6 +189,7 @@ def main():
     finally:
         server.stop()
         shutil.rmtree(work_dir, ignore_errors=True)
+        _restore_denylist()
 
     # --- Overall ---
     print()
