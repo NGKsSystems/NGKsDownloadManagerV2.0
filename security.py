@@ -290,3 +290,7 @@ def _log_security_event(event_type: str, task_id: str = "",
         logger.warning(msg)
     else:
         logger.info(msg)
+
+
+# Public alias for cross-module use (F8+)
+log_security_event = _log_security_event

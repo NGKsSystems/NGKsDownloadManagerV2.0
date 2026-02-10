@@ -106,6 +106,31 @@ def cmd_version(args):
     print(f"NGKs Download Manager v{ver}")
 
 
+def cmd_ytdlp_check(args):
+    """ytdlp check: show current + latest yt-dlp version"""
+    from ytdlp_manager import get_current_ytdlp_version, get_latest_ytdlp_version
+
+    current = get_current_ytdlp_version()
+    print(f"Current yt-dlp version: {current or 'not installed'}")
+
+    latest = get_latest_ytdlp_version()
+    if latest:
+        print(f"Latest yt-dlp version:  {latest}")
+        if current and current.strip().lower() == latest.strip().lower():
+            print("yt-dlp is up to date.")
+        elif current:
+            print(f"Update available: {current} -> {latest}")
+    else:
+        print("Could not fetch latest version (network error).")
+
+
+def cmd_ytdlp_update(args):
+    """ytdlp update: check + prompt + update"""
+    from ytdlp_manager import check_and_prompt_cli
+    exit_code = check_and_prompt_cli(auto_yes=args.yes)
+    sys.exit(exit_code)
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="ngks-dl",
@@ -147,6 +172,21 @@ def main():
     # --- version ---
     ver = subparsers.add_parser("version", help="Print version")
     ver.set_defaults(func=cmd_version)
+
+    # --- ytdlp ---
+    ytdlp_parser = subparsers.add_parser("ytdlp", help="yt-dlp lifecycle management")
+    ytdlp_sub = ytdlp_parser.add_subparsers(dest="ytdlp_command",
+                                             help="yt-dlp sub-commands")
+
+    # ytdlp check
+    yt_check = ytdlp_sub.add_parser("check", help="Show current + latest yt-dlp version")
+    yt_check.set_defaults(func=cmd_ytdlp_check)
+
+    # ytdlp update
+    yt_update = ytdlp_sub.add_parser("update", help="Check for update and install")
+    yt_update.add_argument("--yes", "-y", action="store_true",
+                           help="Auto-accept update without prompting")
+    yt_update.set_defaults(func=cmd_ytdlp_update)
 
     args = parser.parse_args()
 
