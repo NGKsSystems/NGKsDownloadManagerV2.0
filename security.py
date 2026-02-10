@@ -199,6 +199,81 @@ def choose_final_dir(base_download_dir: str, filename: str) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# 1.4 Archive Path Safety (ZipSlip Guard)
+# ---------------------------------------------------------------------------
+
+class ArchivePathBlockedError(Exception):
+    """Raised when an archive member path is malicious (ZipSlip, abs, UNC, etc.)."""
+    pass
+
+
+def safe_extract_path(base_dir: str, member_path: str) -> str:
+    """Validate that *member_path* (from a zip/tar archive) resolves inside *base_dir*.
+
+    Blocks:
+      - ``..`` components (parent traversal / ZipSlip)
+      - Absolute paths
+      - Windows drive letters (``C:``)
+      - UNC paths (``\\\\server``)
+      - Null bytes
+
+    Returns the resolved absolute path on success.
+    Raises :class:`ArchivePathBlockedError` on violation.
+    Emits ``SECURITY.ARCHIVE_PATH_BLOCKED`` event on violation.
+    """
+    if "\x00" in member_path:
+        _log_security_event("ARCHIVE_PATH_BLOCKED",
+                            reason="null_byte",
+                            detail=f"member={member_path!r}")
+        raise ArchivePathBlockedError(f"null byte in archive member: {member_path!r}")
+
+    # UNC path (check BEFORE normalizing backslashes)
+    if member_path.startswith("\\\\") or member_path.startswith("//"):
+        _log_security_event("ARCHIVE_PATH_BLOCKED",
+                            reason="unc_path",
+                            detail=f"member={member_path!r}")
+        raise ArchivePathBlockedError(f"UNC path in archive member: {member_path!r}")
+
+    # Normalize separators
+    normalized = member_path.replace("\\", "/")
+
+    # Absolute path
+    if normalized.startswith("/"):
+        _log_security_event("ARCHIVE_PATH_BLOCKED",
+                            reason="absolute_path",
+                            detail=f"member={member_path!r}")
+        raise ArchivePathBlockedError(f"absolute path in archive member: {member_path!r}")
+
+    # Windows drive letter
+    if len(normalized) >= 2 and normalized[1] == ":":
+        _log_security_event("ARCHIVE_PATH_BLOCKED",
+                            reason="drive_letter",
+                            detail=f"member={member_path!r}")
+        raise ArchivePathBlockedError(f"drive letter in archive member: {member_path!r}")
+
+    # Parent traversal (.. component)
+    parts = normalized.split("/")
+    if ".." in parts:
+        _log_security_event("ARCHIVE_PATH_BLOCKED",
+                            reason="parent_traversal",
+                            detail=f"member={member_path!r}")
+        raise ArchivePathBlockedError(f"parent traversal in archive member: {member_path!r}")
+
+    # Final resolution check (belt + suspenders after component checks)
+    resolved_base = os.path.realpath(os.path.abspath(base_dir))
+    resolved = os.path.realpath(os.path.abspath(os.path.join(resolved_base, normalized)))
+
+    if not resolved.startswith(resolved_base + os.sep) and resolved != resolved_base:
+        _log_security_event("ARCHIVE_PATH_BLOCKED",
+                            reason="resolved_escape",
+                            detail=f"base={resolved_base} resolved={resolved}")
+        raise ArchivePathBlockedError(
+            f"archive member escapes root: base={resolved_base!r} resolved={resolved!r}")
+
+    return resolved
+
+
+# ---------------------------------------------------------------------------
 # 2. Executable Classification
 # ---------------------------------------------------------------------------
 
