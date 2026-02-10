@@ -36,7 +36,8 @@ v*_output.txt
 acceptance_output.txt
 
 cache/
-config/
+config/*
+!config/policy.json
 tests/dev_scratch/
 
 # Runtime logs (exclude from tracking but allow dirs to exist)
