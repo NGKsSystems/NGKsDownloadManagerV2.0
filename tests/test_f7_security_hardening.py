@@ -342,8 +342,11 @@ def main():
                   f"orphans={orphans}" if orphans else "clean")
 
             # E5: exe file downloaded but warning was logged
+            # F10: risky extensions now go to _quarantine subdir
             exe_path = os.path.join(dl_dir, exe_fname)
-            check("E5: .exe file downloaded (not blocked)", os.path.exists(exe_path))
+            exe_path_q = os.path.join(dl_dir, "_quarantine", exe_fname)
+            check("E5: .exe file downloaded (not blocked)",
+                  os.path.exists(exe_path) or os.path.exists(exe_path_q))
             has_exec_warn = any("SECURITY.EXECUTABLE_WARNING" in e
                                 and "f7_test.exe" in e for e in capture.events)
             check("E6: executable warning in security log", has_exec_warn)

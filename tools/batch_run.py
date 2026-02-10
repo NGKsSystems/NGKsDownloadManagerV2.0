@@ -25,7 +25,7 @@ if _PROJECT_ROOT not in sys.path:
 from tools.batch_schema import validate_batch_dict
 from queue_manager import QueueManager, TaskState
 from download_manager import DownloadManager
-from security import safe_join, sanitize_filename, PathTraversalError
+from security import safe_join, sanitize_filename, PathTraversalError, choose_final_dir
 
 logger = logging.getLogger("batch_run")
 
@@ -85,14 +85,17 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
 
     # --- Merge defaults + enqueue ---
     denied_items: List[Dict[str, Any]] = []
+    _quarantine_map: Dict[str, Dict[str, Any]] = {}
 
     for item in items:
         dest_dir = item.get("dest_dir") or defaults.get("dest_dir") or "downloads"
         raw_filename = item.get("filename") or item["url"].rstrip("/").split("/")[-1] or "download"
         # F7: sanitize filename + path containment
         filename = sanitize_filename(raw_filename)
+        # F10: quarantine risky extensions
+        final_dir, quarantined = choose_final_dir(dest_dir, filename)
         try:
-            dest = safe_join(dest_dir, filename)
+            dest = safe_join(final_dir, filename)
         except PathTraversalError as e:
             logger.warning(f"BATCH | DENIED | id={item['id']} | reason=path_traversal: {e}")
             print(f"DENIED: {item['id']} -- path traversal blocked: {e}", file=sys.stderr)
@@ -106,12 +109,20 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
                 "started_at": now_utc,
                 "ended_at": now_utc,
                 "error": f"path traversal blocked: {e}",
+                "quarantined": quarantined,
+                "quarantine_reason": "dangerous_extension" if quarantined else None,
             })
             continue
-        os.makedirs(dest_dir, exist_ok=True)
+        os.makedirs(final_dir, exist_ok=True)
 
         priority = item.get("priority") or defaults.get("priority") or 5
         connections = item.get("connections") or defaults.get("connections") or 1
+
+        # Track quarantine metadata per item
+        _quarantine_meta = {
+            "quarantined": quarantined,
+            "quarantine_reason": "dangerous_extension" if quarantined else None,
+        }
 
         try:
             qm.enqueue(
@@ -122,7 +133,11 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
                 mode="auto",
                 connections=connections,
             )
-            logger.info(f"BATCH | ENQUEUED | id={item['id']} | url={item['url'][:60]}")
+            # Stash quarantine metadata to inject into report later
+            if quarantined:
+                _quarantine_map[item["id"]] = _quarantine_meta
+            logger.info(f"BATCH | ENQUEUED | id={item['id']} | url={item['url'][:60]}"
+                        + (f" | quarantined=true" if quarantined else ""))
         except ValueError as e:
             # Policy denied or duplicate -- clear message to stderr
             reason = str(e)
@@ -138,6 +153,8 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
                 "started_at": now_utc,
                 "ended_at": now_utc,
                 "error": str(e),
+                "quarantined": quarantined,
+                "quarantine_reason": "dangerous_extension" if quarantined else None,
             })
 
     # --- Start scheduler ---
@@ -200,6 +217,7 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             sha = _sha256_file(dest)
             file_size = os.path.getsize(dest)
 
+        qmeta = _quarantine_map.get(tid, {})
         results.append({
             "task_id": tid,
             "url": task_dict["url"],
@@ -211,6 +229,8 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             "started_at": task_dict.get("created_at", now_utc),
             "ended_at": task_dict.get("updated_at", now_utc),
             "error": task_dict.get("error"),
+            "quarantined": qmeta.get("quarantined", False),
+            "quarantine_reason": qmeta.get("quarantine_reason"),
         })
 
     # Add denied items

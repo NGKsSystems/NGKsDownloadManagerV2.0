@@ -161,6 +161,44 @@ def sanitize_filename(name: str, max_length: int = 200) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 1.3 Quarantine for Risky Extensions
+# ---------------------------------------------------------------------------
+
+def should_quarantine(filename: str) -> bool:
+    """Return True if *filename* has a dangerous extension that warrants quarantine."""
+    _, ext = os.path.splitext(filename.lower())
+    return ext in DANGEROUS_EXTENSIONS
+
+
+def quarantine_dir(base_download_dir: str) -> str:
+    """Return the quarantine sub-directory under *base_download_dir*.
+
+    Creates it if it doesn't exist.
+    """
+    d = os.path.join(base_download_dir, "_quarantine")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def choose_final_dir(base_download_dir: str, filename: str) -> tuple:
+    """Decide where a file should land: normal dir or quarantine.
+
+    Returns ``(dir_path, quarantined_bool)``.
+    If quarantined, emits ``SECURITY.QUARANTINE_SELECTED``.
+    """
+    if should_quarantine(filename):
+        d = quarantine_dir(base_download_dir)
+        _log_security_event(
+            "QUARANTINE_SELECTED",
+            final_path=os.path.join(d, filename),
+            reason="dangerous_extension",
+            detail=f"ext={os.path.splitext(filename)[1]}",
+        )
+        return d, True
+    return base_download_dir, False
+
+
+# ---------------------------------------------------------------------------
 # 2. Executable Classification
 # ---------------------------------------------------------------------------
 
@@ -284,7 +322,8 @@ def _log_security_event(event_type: str, task_id: str = "",
 
     msg = " | ".join(parts)
 
-    if event_type in ("PATH_TRAVERSAL_BLOCKED", "RIDER_FILE_DETECTED"):
+    if event_type in ("PATH_TRAVERSAL_BLOCKED", "RIDER_FILE_DETECTED",
+                       "QUARANTINE_SELECTED"):
         logger.warning(msg)
     elif event_type == "EXECUTABLE_WARNING":
         logger.warning(msg)

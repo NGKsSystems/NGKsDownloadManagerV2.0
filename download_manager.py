@@ -19,7 +19,7 @@ from pathlib import Path
 from policy_engine import PolicyEngine
 
 # F7: Security hardening
-from security import safe_join, sanitize_filename, warn_if_executable, PathTraversalError
+from security import safe_join, sanitize_filename, warn_if_executable, PathTraversalError, choose_final_dir
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -201,7 +201,10 @@ class DownloadManager:
         if os.path.isdir(destination):
             filename = self._get_filename_from_url(url)
             # F7: path containment -- filename must stay inside destination
-            filepath = safe_join(destination, filename)
+            # F10: quarantine risky extensions
+            final_dir, _quarantined = choose_final_dir(destination, filename)
+            os.makedirs(final_dir, exist_ok=True)
+            filepath = safe_join(final_dir, filename)
         else:
             filepath = destination
             filename = os.path.basename(filepath)
