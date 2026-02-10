@@ -214,7 +214,7 @@ class ConfigManager:
 class HistoryManager:
     """Manage V2 download history - separate from V1"""
     
-    def __init__(self, history_file="data/runtime/download_history_v2.json"):
+    def __init__(self, history_file="data/download_history_v2.json"):
         self.history_file = history_file
         # Ensure data directory exists
         os.makedirs(os.path.dirname(history_file), exist_ok=True)

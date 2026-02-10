@@ -96,6 +96,7 @@ Run-Test "V2.6" "& '$PY' tests\test_v26_queue.py" "v26_output.txt" $false
 Run-Test "V2.7" "& '$PY' tests\test_v27_persistence.py" "v27_output.txt" $false
 Run-Test "V2.8" "& '$PY' tests\test_v28_execution_policy.py" "v28_output.txt" $false
 Run-Test "V2.9" "& '$PY' tests\test_v29_ui_contract.py" "v29_output.txt" $false
+Run-Test "HIST" "& '$PY' tools\gates\gate_history_paths.py" "hist_output.txt" $false
 
 Write-Host "ALL REQUIRED GATES PASS (legacy gates promoted to blocking after reconciliation)."
 exit 0
