@@ -100,3 +100,4 @@ Run-Test "HIST" "& '$PY' tools\gates\gate_history_paths.py" "hist_output.txt" $f
 
 Write-Host "ALL REQUIRED GATES PASS (legacy gates promoted to blocking after reconciliation)."
 exit 0
+
