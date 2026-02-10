@@ -105,6 +105,7 @@ Run-Test "F9" "& '$PY' tests\test_f9_integration_polish.py" "f9_output.txt" $fal
 Run-Test "F10" "& '$PY' tests\test_f10_quarantine_default.py" "f10_output.txt" $false
 Run-Test "F11" "& '$PY' tests\test_f11_sha256_verify.py" "f11_output.txt" $false
 Run-Test "F12" "& '$PY' tests\test_f12_archive_safety.py" "f12_output.txt" $false
+Run-Test "F14" "& '$PY' tests\test_f14_policy_ux.py" "f14_output.txt" $false
 
 Write-Host "ALL REQUIRED GATES PASS (legacy gates promoted to blocking after reconciliation)."
 exit 0

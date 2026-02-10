@@ -21,6 +21,7 @@ class PolicyDecision:
     action: str  # ALLOW, DENY, MODIFY
     reason: str
     annotations: Dict[str, Any] = None
+    code: str = ""  # structured denial code (e.g. DENY_HOST_DENYLIST)
     
     def __post_init__(self):
         if self.annotations is None:
@@ -153,7 +154,7 @@ class PolicyEngine:
         # Check global policies first
         global_policies = self.policies.get('global', {})
         if global_policies.get('safe_mode', False):
-            return PolicyDecision('DENY', f"safe_mode enabled")
+            return PolicyDecision('DENY', "safe_mode enabled", code="DENY_SAFE_MODE")
         
         # Check host allowlist/denylist
         host_policies = self.policies.get('per_host', {})
@@ -161,10 +162,22 @@ class PolicyEngine:
         denylist = host_policies.get('denylist', [])
         
         if allowlist and host not in allowlist:
-            return PolicyDecision('DENY', f"host {host} not in allowlist")
+            decision = PolicyDecision('DENY', f"host {host} not in allowlist",
+                                       code="DENY_HOST_ALLOWLIST")
+            if self._consume_exception("host", host):
+                self.logger.info(f"POLICY | EXCEPTION_USED | type=host | value={host} | task_id={task_id}")
+                return PolicyDecision('ALLOW', f"host {host} allowed via one-time exception",
+                                       code="ALLOW_EXCEPTION")
+            return decision
         
         if denylist and host in denylist:
-            return PolicyDecision('DENY', f"host {host} in denylist")
+            decision = PolicyDecision('DENY', f"host {host} in denylist",
+                                       code="DENY_HOST_DENYLIST")
+            if self._consume_exception("host", host):
+                self.logger.info(f"POLICY | EXCEPTION_USED | type=host | value={host} | task_id={task_id}")
+                return PolicyDecision('ALLOW', f"host {host} allowed via one-time exception",
+                                       code="ALLOW_EXCEPTION")
+            return decision
         
         # Check file type policies
         file_policies = self.policies.get('file_type', {})
@@ -172,11 +185,13 @@ class PolicyEngine:
             file_ext = os.path.splitext(destination)[1].lower()
             blocked_exts = file_policies.get('blocked_extensions', [])
             if file_ext in blocked_exts:
-                return PolicyDecision('DENY', f"file extension {file_ext} blocked")
+                return PolicyDecision('DENY', f"file extension {file_ext} blocked",
+                                       code="DENY_EXTENSION_BLOCKED")
             
             allowed_exts = file_policies.get('allowed_extensions', [])
             if allowed_exts and file_ext not in allowed_exts:
-                return PolicyDecision('DENY', f"file extension {file_ext} not in allowed list")
+                return PolicyDecision('DENY', f"file extension {file_ext} not in allowed list",
+                                       code="DENY_EXTENSION_NOT_ALLOWED")
         
         # Check per-task policies for annotations
         task_policies = self.policies.get('per_task', {})
@@ -219,7 +234,8 @@ class PolicyEngine:
         
         # If policy sets a stricter limit than engine, annotate it
         if policy_max_retries and attempt >= policy_max_retries:
-            return PolicyDecision('DENY', f"policy retry limit {policy_max_retries} exceeded")
+            return PolicyDecision('DENY', f"policy retry limit {policy_max_retries} exceeded",
+                                   code="DENY_RETRY_LIMIT")
         
         return PolicyDecision('ALLOW', "retry policy passed")
     
@@ -250,6 +266,44 @@ class PolicyEngine:
         
         return PolicyDecision('ALLOW', 'resume_policy_passed')
     
+    # ---- F14: Allow-once exception store ----
+    _EXCEPTION_PATH = os.path.join("data", "runtime", "policy_exceptions.json")
+
+    def _load_exceptions(self) -> List[Dict[str, Any]]:
+        """Load the allow-once exception list from disk."""
+        try:
+            if os.path.exists(self._EXCEPTION_PATH):
+                with open(self._EXCEPTION_PATH, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    return data
+        except Exception:
+            pass
+        return []
+
+    def _save_exceptions(self, exceptions: List[Dict[str, Any]]) -> None:
+        os.makedirs(os.path.dirname(self._EXCEPTION_PATH), exist_ok=True)
+        with open(self._EXCEPTION_PATH, "w", encoding="utf-8") as f:
+            json.dump(exceptions, f, indent=2)
+
+    def add_exception(self, exc_type: str, value: str) -> None:
+        """Add a one-time policy exception (e.g. type='host', value='evil.com').
+        The exception is consumed on first matching check_enqueue_policy call."""
+        exceptions = self._load_exceptions()
+        exceptions.append({"type": exc_type, "value": value, "used": False})
+        self._save_exceptions(exceptions)
+        self.logger.info(f"POLICY | EXCEPTION_ADDED | type={exc_type} | value={value}")
+
+    def _consume_exception(self, exc_type: str, value: str) -> bool:
+        """Check for a matching unused exception; if found, mark it used and return True."""
+        exceptions = self._load_exceptions()
+        for exc in exceptions:
+            if exc.get("type") == exc_type and exc.get("value") == value and not exc.get("used"):
+                exc["used"] = True
+                self._save_exceptions(exceptions)
+                return True
+        return False
+
     def _extract_host(self, url: str) -> str:
         """Extract hostname from URL (strips port)"""
         try:
@@ -263,13 +317,14 @@ class PolicyEngine:
         Apply policy decision by logging it
         NEVER modifies engine behavior - logging only
         """
+        code_tag = f" | code={decision.code}" if decision.code else ""
         if decision.action == 'ALLOW':
-            self.logger.info(f"POLICY | ALLOW | task_id={task_id} | reason={decision.reason}")
+            self.logger.info(f"POLICY | ALLOW | task_id={task_id} | reason={decision.reason}{code_tag}")
         elif decision.action == 'DENY':
-            self.logger.info(f"POLICY | DENY | task_id={task_id} | reason={decision.reason}")
+            self.logger.info(f"POLICY | DENY | task_id={task_id} | reason={decision.reason}{code_tag}")
         elif decision.action == 'MODIFY':
             annotations = ', '.join(f"{k}={v}" for k, v in decision.annotations.items())
-            self.logger.info(f"POLICY | MODIFY | task_id={task_id} | annotation={annotations}")
+            self.logger.info(f"POLICY | MODIFY | task_id={task_id} | annotation={annotations}{code_tag}")
     
     def reload_policies(self) -> bool:
         """Reload policies from disk (hot reload)"""

@@ -264,7 +264,8 @@ class QueueManager:
                     
                     if decision.action == 'DENY':
                         self._log_task(30, task_id, "POLICY_DENIED", reason=decision.reason)  # WARNING
-                        raise ValueError(f"Queue policy denied: {decision.reason}")
+                        code_tag = f" [{decision.code}]" if decision.code else ""
+                        raise ValueError(f"Queue policy denied{code_tag}: {decision.reason}")
                 except ValueError:
                     raise  # Propagate policy denial to caller
                 except Exception as e:
