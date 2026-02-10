@@ -64,7 +64,7 @@ class TestPersistence:
         ]
         
         for task_id, state in test_states:
-            queue_mgr.enqueue(task_id, f"http://example.com/{task_id}", f"/tmp/{task_id}")
+            queue_mgr.enqueue(task_id, f"http://127.0.0.1:{self.server_port}/{task_id}", f"/tmp/{task_id}")
             # Manually set state for testing
             queue_mgr.tasks[task_id].state = state
             if state in [TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED]:
@@ -135,7 +135,7 @@ class TestPersistence:
         queue_mgr = QueueManager(max_active_downloads=2, persist_queue=True, queue_state_path=state_path)
         
         for task_id, state in test_states:
-            queue_mgr.enqueue(task_id, f"http://example.com/{task_id}", f"/tmp/{task_id}")
+            queue_mgr.enqueue(task_id, f"http://127.0.0.1:{self.server_port}/{task_id}", f"/tmp/{task_id}")
             queue_mgr.tasks[task_id].state = state
             if state in [TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED]:
                 queue_mgr._add_to_history(queue_mgr.tasks[task_id])
@@ -189,7 +189,7 @@ class TestPersistence:
         # Add tasks
         task_ids = ["unique1", "unique2", "unique3"]
         for task_id in task_ids:
-            queue_mgr.enqueue(task_id, f"http://example.com/{task_id}", f"/tmp/{task_id}")
+            queue_mgr.enqueue(task_id, f"http://127.0.0.1:{self.server_port}/{task_id}", f"/tmp/{task_id}")
         
         # Save state
         save_queue_state(queue_mgr, state_path)
