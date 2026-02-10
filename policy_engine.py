@@ -101,6 +101,12 @@ class PolicyEngine:
                     "allowed_extensions": [],  # Empty = allow all
                     "blocked_extensions": [".exe", ".bat", ".cmd", ".scr"],
                     "max_file_size_mb": None   # None = unlimited
+                },
+                "network": {
+                    "tls_only": False,
+                    "retries": 3,
+                    "backoff_ms": 1000,
+                    "honor_proxy_env": True
                 }
             }
         }
@@ -134,7 +140,8 @@ class PolicyEngine:
             "global": {"safe_mode": False, "offline_mode": False},
             "per_task": {"max_speed_bps": None, "max_retries": None, "timeout_seconds": 600},
             "per_host": {"allowlist": [], "denylist": [], "max_connections_per_host": 4},
-            "file_type": {"allowed_extensions": [], "blocked_extensions": [], "max_file_size_mb": None}
+            "file_type": {"allowed_extensions": [], "blocked_extensions": [], "max_file_size_mb": None},
+            "network": {"tls_only": False, "retries": 3, "backoff_ms": 1000, "honor_proxy_env": True}
         }
     
     def check_enqueue_policy(self, task_id: str, url: str, destination: str, **options) -> PolicyDecision:
@@ -211,6 +218,38 @@ class PolicyEngine:
         
         return PolicyDecision('ALLOW', "all policies passed")
     
+    def check_network_policy(self, url: str, task_id: str = "") -> PolicyDecision:
+        """F15: Check network-level policy knobs (tls_only, retries, backoff, proxy)."""
+        self.logger.info(f"POLICY | CHECK | scope=network | task_id={task_id}")
+        net = self.policies.get("network", {})
+
+        # tls_only: reject non-https URLs
+        tls_only = net.get("tls_only", False)
+        if tls_only:
+            try:
+                scheme = urlparse(url).scheme.lower()
+            except Exception:
+                scheme = ""
+            if scheme != "https":
+                return PolicyDecision("DENY",
+                                       f"tls_only: scheme {scheme!r} not allowed",
+                                       code="DENY_SCHEME_NOT_TLS")
+
+        # Expose retry / backoff / proxy as annotations
+        annotations: Dict[str, Any] = {}
+        retries = net.get("retries")
+        if retries is not None:
+            annotations["retries"] = int(retries)
+        backoff = net.get("backoff_ms")
+        if backoff is not None:
+            annotations["backoff_ms"] = int(backoff)
+        honor_proxy = net.get("honor_proxy_env", True)
+        annotations["honor_proxy_env"] = honor_proxy
+
+        if annotations:
+            return PolicyDecision("MODIFY", "network policies applied", annotations)
+        return PolicyDecision("ALLOW", "network policy passed")
+
     def check_start_policy(self, task_id: str, url: str) -> PolicyDecision:
         """Policy check at task start time"""
         self.logger.info(f"POLICY | CHECK | scope=task | rule=start | task_id={task_id}")
