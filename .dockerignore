@@ -1,8 +1,79 @@
-__pycache__/
+# ============================================================
+# .dockerignore — NGKs Download Manager v2.0.0 RC
+# Keeps the production image lean.  Everything here is
+# excluded from the Docker build context (COPY . /app).
+# ============================================================
+
+# --- Version control / CI ---
 .git/
 .github/
-downloads/
-logs/
-cache/
+.gitignore
+
+# --- Python build artifacts ---
+__pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+.pytest_cache/
+
+# --- Virtual environments ---
+.venv/
+venv/
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+.history/
+.DS_Store
+Thumbs.db
+
+# --- Test infrastructure (NEVER ship) ---
+tests/
+scripts/
+artifacts/
+local_range_server.py
+find_range_server.py
+benchmark_harness.py
+benchmark_performance.py
+benchmark_v21.py
+final_verification.py
+phase10_verification.py
+technical_verification.py
+validate_v4.py
+verification_gates_g9.py
+verify_gates_g1_g5.py
+verify_policy_gates.py
+verify_ui_fixes.py
+verify_v21.py
+verify_v2_history.py
+verify_v2_startup.py
+test_*.py
+test_*.txt
+step_*.txt
+det_output.txt
+
+# --- Runtime data (created at runtime, not baked in) ---
+logs/
+logs_archive/
+downloads/
+exports/
+cache/
+data/runtime/
+data/download_history_v2.json
+data/queue_state.json
+_orphan_archive/
+
+# --- Temp / scratch ---
+*.part
+*.resume
+*.download.tmp
+batch*.json
+report*.json
+*.log
+*.log.*
 .env
