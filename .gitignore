@@ -1,4 +1,6 @@
-# ---- Python / virtualenv ----
+# ============================================================
+# PYTHON / VIRTUAL ENV
+# ============================================================
 .venv/
 venv/
 __pycache__/
@@ -14,7 +16,10 @@ pip-wheel-metadata/
 .coverage
 coverage.xml
 
-# ---- OS / editor ----
+
+# ============================================================
+# OS / EDITOR
+# ============================================================
 .DS_Store
 Thumbs.db
 .vscode/
@@ -22,39 +27,62 @@ Thumbs.db
 .history/
 .vscode/.history/
 
-# ---- Dev/Build artifacts (MUST NOT BE TRACKED) ----
-artifacts/gates/
-artifacts/verification/
-artifacts/test-downloads/
-artifacts/exports/
-data/gates/
-logs_archive/
+
+# ============================================================
+# GENERATED / BUILD ARTIFACTS  (NEVER TRACK)
+# ============================================================
+artifacts/
+cache/
 downloads/
 exports/
+logs_archive/
+_orphan_archive/
+
 *_core_test.txt
 v*_output.txt
 acceptance_output.txt
 
-cache/
-config/*
-!config/policy.json
-tests/dev_scratch/
 
-# Runtime logs (exclude from tracking but allow dirs to exist)
-logs/*.log
-*.log.*
+# ============================================================
+# RUNTIME DATA  (NEVER COMMIT)
+# ============================================================
 
-# ---- RUNTIME DATA (generated at runtime, never committed) ----
-logs/runtime/*.log
-logs/runtime/*.log.*
+# All runtime logs (canonical + preset aliases)
+logs/
+
+# Runtime state
 data/runtime/
 data/download_history_v2.json
 data/queue_state.json
 
-# ---- OPERATIONAL DIRS (DO NOT IGNORE) ----
-# logs/runtime/ and data/runtime/ are generated at runtime — see patterns above
+
+# ============================================================
+# CONFIG
+# ============================================================
+
+# Ignore all config except policy.json
+config/*
+!config/policy.json
 
 
-# local forensic archive
-_orphan_archive/
+# ============================================================
+# TEST SCRATCH
+# ============================================================
+tests/dev_scratch/
 
+
+# ============================================================
+# SAFETY NETS
+# ============================================================
+
+# Temporary files
+*.part
+*.resume
+*.download.tmp
+
+# Batch/test leftovers
+batch*.json
+report*.json
+test*.csv
+*.log
+*.log.*
