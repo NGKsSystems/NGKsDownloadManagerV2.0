@@ -30,6 +30,9 @@ from tools.forensics import (
     policy_version_hash as _policy_version_hash,
     os_platform as _os_platform,
     python_version as _python_version,
+    get_naming_preset,
+    build_display_name,
+    append_alias_index,
 )
 from queue_manager import QueueManager, TaskState
 from download_manager import DownloadManager
@@ -71,8 +74,11 @@ def _classify_failure(state: str, error: str | None) -> str:
 
 def build_log_folder(base: str, mode: str, summary: Dict[str, int],
                      short_id: str = "") -> str:
-    """Build a human-readable log folder path:
+    """Build the CANONICAL log folder path (never changes with preset):
     YYYY-MM-DD/HHMMSS - <mode> - <summary> - <shortid>/
+
+    The canonical path is always summary-style for traceability.
+    Display name / aliases are layered on top via session_meta.json.
     """
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
@@ -85,7 +91,7 @@ def build_log_folder(base: str, mode: str, summary: Dict[str, int],
         tag = f"{c}ok_{f}fail"
     sid = short_id or uuid.uuid4().hex[:8]
     folder_name = f"{time_str} - {mode} - {tag} - {sid}"
-    return os.path.join(base, date_str, folder_name)
+    return os.path.join(base, date_str, folder_name), time_str, tag, sid
 
 
 # ---------------------------------------------------------------------------
@@ -354,13 +360,45 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
     }
 
     # --- Write report + session log folder ---
-    log_dir = build_log_folder(
+    log_dir, log_time_str, summary_tag, log_sid = build_log_folder(
         os.path.join(_PROJECT_ROOT, "logs"),
         "batch", summary,
     )
     os.makedirs(log_dir, exist_ok=True)
+
+    # F17: Compute display name based on user preset
+    preset = get_naming_preset()
+    # Extract primary_host and first_filename from items for host/firstfile presets
+    primary_host = ""
+    first_filename = ""
+    if items:
+        first_url = items[0].get("url", "")
+        primary_host = _extract_host(first_url)
+        first_filename = (
+            items[0].get("filename")
+            or first_url.rstrip("/").split("/")[-1]
+            or "download"
+        )
+    display_name = build_display_name(
+        preset=preset,
+        mode="batch",
+        short_id=log_sid,
+        summary_tag=summary_tag,
+        primary_host=primary_host,
+        first_filename=first_filename,
+        time_str=log_time_str,
+    )
+
+    # Canonical relative path (date/folder_name)
+    canonical_rel = os.path.relpath(log_dir, os.path.join(_PROJECT_ROOT, "logs"))
+
     session_meta = {
         "run_id": report["run_id"],
+        "started_at": now_utc,
+        "canonical_path": canonical_rel,
+        "display_name": display_name,
+        "naming_preset": preset,
+        "aliases": [display_name],
         "app_version": report["app_version"],
         "git_rev": report["git_rev"],
         "policy_version_hash": report["policy_version_hash"],
@@ -371,6 +409,18 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
     meta_path = os.path.join(log_dir, "session_meta.json")
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(session_meta, f, indent=2)
+
+    # F17: Append to alias index
+    try:
+        append_alias_index(
+            run_id=report["run_id"],
+            canonical_rel=canonical_rel,
+            display_name=display_name,
+            preset=preset,
+            ts=now_utc,
+        )
+    except Exception:
+        pass  # alias index is best-effort
 
     if report_path:
         os.makedirs(os.path.dirname(os.path.abspath(report_path)), exist_ok=True)

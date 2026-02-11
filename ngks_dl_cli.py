@@ -148,6 +148,25 @@ def cmd_ytdlp_update(args):
     sys.exit(exit_code)
 
 
+def cmd_logs_preset(args):
+    """logs preset --get or --set <value>"""
+    from tools.forensics import get_naming_preset, set_naming_preset, VALID_PRESETS
+
+    if args.get_preset:
+        print(get_naming_preset())
+    elif args.set_preset:
+        value = args.set_preset
+        if value not in VALID_PRESETS:
+            print(f"ERROR: invalid preset {value!r}; valid: {', '.join(VALID_PRESETS)}",
+                  file=sys.stderr)
+            sys.exit(2)
+        set_naming_preset(value)
+        print(f"Naming preset set to: {value}")
+    else:
+        print(f"Current preset: {get_naming_preset()}")
+        print(f"Valid presets: {', '.join(VALID_PRESETS)}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="ngks-dl",
@@ -204,6 +223,20 @@ def main():
     yt_update.add_argument("--yes", "-y", action="store_true",
                            help="Auto-accept update without prompting")
     yt_update.set_defaults(func=cmd_ytdlp_update)
+
+    # --- logs ---
+    logs_parser = subparsers.add_parser("logs", help="Forensic-log settings")
+    logs_sub = logs_parser.add_subparsers(dest="logs_command",
+                                          help="Log sub-commands")
+
+    # logs preset
+    preset_parser = logs_sub.add_parser("preset", help="Get or set the naming preset")
+    preset_grp = preset_parser.add_mutually_exclusive_group()
+    preset_grp.add_argument("--get", dest="get_preset", action="store_true",
+                            help="Print current naming preset")
+    preset_grp.add_argument("--set", dest="set_preset", metavar="PRESET",
+                            help="Set naming preset (shortid|summary|host|firstfile)")
+    preset_parser.set_defaults(func=cmd_logs_preset)
 
     args = parser.parse_args()
 

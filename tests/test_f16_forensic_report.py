@@ -134,7 +134,7 @@ def test_c_classify_failure():
 def test_d_log_folder_pattern():
     print("\n[D] build_log_folder pattern")
     summary = {"completed": 3, "failed": 0, "denied": 0}
-    folder = build_log_folder("/logs", "batch", summary, short_id="abc12345")
+    folder, _ts, _tag, _sid = build_log_folder("/logs", "batch", summary, short_id="abc12345")
     # Expected: /logs/YYYY-MM-DD/HHMMSS - batch - 3ok - abc12345
     check("D1: contains YYYY-MM-DD subfolder",
           re.search(r"\d{4}-\d{2}-\d{2}", folder) is not None, f"got {folder}")
@@ -145,7 +145,7 @@ def test_d_log_folder_pattern():
 
     # With failures
     summary2 = {"completed": 2, "failed": 1, "denied": 1}
-    folder2 = build_log_folder("/logs", "batch", summary2, short_id="x1234567")
+    folder2, _ts2, _tag2, _sid2 = build_log_folder("/logs", "batch", summary2, short_id="x1234567")
     check("D5: contains 2ok_2fail tag", "2ok_2fail" in folder2, f"got {folder2}")
 
 

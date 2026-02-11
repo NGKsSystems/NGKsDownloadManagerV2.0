@@ -1,0 +1,21 @@
+{
+  "run_id": "2026-02-11T04:26:04.079781+00:00",
+  "started_at": "2026-02-11T04:26:04.079781+00:00",
+  "canonical_path": "2026-02-11\\072608 - batch - 1ok - e017fcaa",
+  "display_name": "072608 - batch - 1ok - e017fcaa",
+  "naming_preset": "summary",
+  "aliases": [
+    "072608 - batch - 1ok - e017fcaa"
+  ],
+  "app_version": "2.0",
+  "git_rev": "fe59eae",
+  "policy_version_hash": "5e908ab7dcfb",
+  "os": "Windows-11-10.0.26100-SP0",
+  "python_version": "3.13.5",
+  "summary": {
+    "completed": 1,
+    "failed": 0,
+    "cancelled": 0,
+    "denied": 0
+  }
+}
