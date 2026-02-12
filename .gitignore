@@ -32,6 +32,7 @@ Thumbs.db
 # GENERATED / BUILD ARTIFACTS  (NEVER TRACK)
 # ============================================================
 artifacts/
+_proof/
 cache/
 downloads/
 exports/
