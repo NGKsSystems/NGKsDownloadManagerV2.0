@@ -2,6 +2,7 @@
 V4 Main Window - PySide6 UI with V1 parity
 All controls wired via ui_adapter (no direct engine access)
 Modern Qt Fusion styling with proper spacing/fonts
+NGKsAcquisitionCore branding (F19/F21)
 """
 
 import os
@@ -11,13 +12,17 @@ from PySide6.QtWidgets import (
     QLineEdit, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog,
     QMessageBox, QCheckBox, QSpinBox, QDoubleSpinBox, QProgressBar, QFrame, QGroupBox, QFormLayout, QComboBox
 )
-from PySide6.QtCore import QTimer, Qt, QThread, Signal
-from PySide6.QtGui import QFont, QGuiApplication, QCursor
+from PySide6.QtCore import QTimer, Qt, QThread, Signal, QSize
+from PySide6.QtGui import QFont, QGuiApplication, QCursor, QPixmap, QIcon
 
 # UI imports (only these allowed)
 from ui_adapter.api import get_adapter, shutdown_adapter
 from ui_adapter.events import get_event_manager, shutdown_events, UIEvent
 from ui_qt.yt_quality_dialog import YouTubeQualityDialog
+from ui_qt.theme import (
+    get_stylesheet, get_window_title, get_status_ready, get_logo_path,
+    Colors, APP_NAME, APP_VERSION, APP_TAGLINE
+)
 
 
 def _ensure_window_on_screen(win) -> None:
@@ -1232,7 +1237,7 @@ class QueueTab(QWidget):
 
 
 class MainWindow(QMainWindow):
-    """V4 Main Window - PySide6 with V1 parity + modern styling"""
+    """V4 Main Window - PySide6 with V1 parity + NGKsAcquisitionCore branding"""
     
     def __init__(self):
         super().__init__()
@@ -1241,91 +1246,75 @@ class MainWindow(QMainWindow):
         self.adapter = get_adapter()
         self.event_manager = get_event_manager()
         
-        # Setup window
-        self.setWindowTitle("NGKsAcquisitionCore v2.0.1 — Powered by NGKsSystems")
+        # Setup window with branded title
+        self.setWindowTitle(get_window_title())
         self.setMinimumSize(800, 600)
         self.resize(1000, 700)
+        
+        # Set window icon if logo available
+        logo_path = get_logo_path(64)
+        if logo_path:
+            self.setWindowIcon(QIcon(logo_path))
         
         # Ensure window is positioned on valid screen area
         _ensure_window_on_screen(self)
         
-        # Apply modern styling
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #f3f3f3;
-            }
-            QGroupBox {
-                font-weight: bold;
-                border: 2px solid #cccccc;
-                border-radius: 6px;
-                margin-top: 12px;
-                padding-top: 6px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-            QTableWidget {
-                gridline-color: #e0e0e0;
-                background-color: white;
-                alternate-background-color: #f8f8f8;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-            }
-            QHeaderView::section {
-                background-color: #e1e1e1;
-                border: none;
-                border-right: 1px solid #cccccc;
-                padding: 6px;
-            }
-            QPushButton {
-                background-color: #e1e1e1;
-                border: 1px solid #adadad;
-                border-radius: 4px;
-                padding: 6px 12px;
-            }
-            QPushButton:hover {
-                background-color: #e5f1fb;
-                border-color: #0078d4;
-            }
-            QPushButton:pressed {
-                background-color: #cce4f7;
-            }
-            QLineEdit {
-                border: 2px solid #cccccc;
-                border-radius: 4px;
-                padding: 6px;
-                background-color: white;
-            }
-            QLineEdit:focus {
-                border-color: #0078d4;
-            }
-            QCheckBox {
-                spacing: 8px;
-            }
-            QSpinBox {
-                border: 2px solid #cccccc;
-                border-radius: 4px;
-                padding: 4px;
-                background-color: white;
-            }
-            QSpinBox:focus {
-                border-color: #0078d4;
-            }
-        """)
+        # Apply NGKsAcquisitionCore dark theme
+        self.setStyleSheet(get_stylesheet())
         
         self.setup_ui()
         self.setup_events()
     
     def setup_ui(self):
-        """Setup main window UI"""
+        """Setup main window UI with branded header"""
         # Create central widget and tab container
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
         layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # === Branded Header ===
+        header = QFrame()
+        header.setStyleSheet(f"""
+            QFrame {{
+                background-color: {Colors.BG};
+                border-bottom: 2px solid {Colors.ACCENT_BLUE};
+                padding: 8px;
+            }}
+        """)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(16, 8, 16, 8)
+        
+        # Logo
+        logo_path = get_logo_path(64)
+        if logo_path:
+            logo_label = QLabel()
+            pixmap = QPixmap(logo_path)
+            logo_label.setPixmap(pixmap.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            header_layout.addWidget(logo_label)
+        
+        # App name + version
+        title_label = QLabel(f"{APP_NAME} v{APP_VERSION}")
+        title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        title_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
+        header_layout.addWidget(title_label)
+        
+        header_layout.addStretch()
+        
+        # Powered by tagline
+        tagline_label = QLabel(APP_TAGLINE)
+        tagline_label.setFont(QFont("Segoe UI", 10))
+        tagline_label.setStyleSheet(f"color: {Colors.MUTED}; background: transparent;")
+        header_layout.addWidget(tagline_label)
+        
+        layout.addWidget(header)
+        
+        # === Main Content Area ===
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(10, 10, 10, 10)
         
         # Create tab widget
         self.tab_widget = QTabWidget()
@@ -1343,10 +1332,11 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.settings_tab, "Settings")  
         self.tab_widget.addTab(self.history_tab, "History")
         
-        layout.addWidget(self.tab_widget)
+        content_layout.addWidget(self.tab_widget)
+        layout.addWidget(content_widget)
         
         # Status bar
-        self.statusBar().showMessage("Ready \u2014 NGKsAcquisitionCore v2.0.1 \u2014 Powered by NGKsSystems")
+        self.statusBar().showMessage(get_status_ready())
         self.statusBar().setFont(QFont("Segoe UI", 9))
     
     def setup_events(self):

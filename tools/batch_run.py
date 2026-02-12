@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Batch runner: load batch.json -> enqueue into QueueManager -> execute -> report.
-F5 contract -- NGKs DL Manager V2.x (Option A path).
+F5 contract -- NGKsAcquisitionCore V2.x (Option A path).
 """
 
 import argparse

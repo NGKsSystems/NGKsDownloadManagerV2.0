@@ -1,4 +1,4 @@
 """
-PySide6 UI package for NGK's Download Manager V4
+PySide6 UI package for NGKsAcquisitionCore
 Modern Qt interface with full V1 parity + wiring
 """

@@ -796,13 +796,13 @@ class UIAdapter:
         """Auto-save logs when a download completes"""
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            logs_dir = r"C:\Users\suppo\Downloads\DL Manager Logs"
+            logs_dir = r"C:\Users\suppo\Downloads\NGKsAcquisitionCore Logs"
             
             # Create directory if it doesn't exist
             os.makedirs(logs_dir, exist_ok=True)
             
             # Create destination filename
-            log_filename = f"NGKs_DownloadManager_Log_task_complete_{timestamp}.log"
+            log_filename = f"NGKsAcquisitionCore_Log_task_complete_{timestamp}.log"
             dest_path = os.path.join(logs_dir, log_filename)
             
             # Copy log file if it exists

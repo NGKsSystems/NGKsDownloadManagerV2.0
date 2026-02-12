@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Batch JSON schema definition and validator.
-F5 contract -- canonical batch format for NGKs DL Manager V2.x.
+F5 contract -- canonical batch format for NGKsAcquisitionCore V2.x.
 """
 
 from urllib.parse import urlparse

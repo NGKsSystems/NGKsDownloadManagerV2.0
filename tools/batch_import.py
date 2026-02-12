@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Batch importer: CSV / XLSX -> canonical batch.json
-F5 contract -- NGKs DL Manager V2.x
+F5 contract -- NGKsAcquisitionCore V2.x
 """
 
 import argparse

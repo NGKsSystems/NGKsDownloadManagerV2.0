@@ -122,16 +122,16 @@ def setup_ui_logging():
 
 
 def auto_save_logs(reason="shutdown"):
-    """Automatically save logs to DL Manager Logs folder with timestamp"""
+    """Automatically save logs to NGKsAcquisitionCore Logs folder with timestamp"""
     try:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        logs_dir = r"C:\Users\suppo\Downloads\DL Manager Logs"
+        logs_dir = r"C:\Users\suppo\Downloads\NGKsAcquisitionCore Logs"
         
         # Create directory if it doesn't exist
         os.makedirs(logs_dir, exist_ok=True)
         
         # Create destination filename
-        log_filename = f"NGKs_DownloadManager_Log_{reason}_{timestamp}.log"
+        log_filename = f"NGKsAcquisitionCore_Log_{reason}_{timestamp}.log"
         dest_path = os.path.join(logs_dir, log_filename)
         
         # Copy log file if it exists
