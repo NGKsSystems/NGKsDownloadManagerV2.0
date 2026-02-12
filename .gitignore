@@ -47,6 +47,9 @@ acceptance_output.txt
 # RUNTIME DATA  (NEVER COMMIT)
 # ============================================================
 
+# NGKs tooling session data
+.ngkssys/
+
 # All runtime logs (canonical + preset aliases)
 logs/
 
