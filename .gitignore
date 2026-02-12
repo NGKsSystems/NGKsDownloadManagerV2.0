@@ -35,6 +35,7 @@ artifacts/
 _proof/
 cache/
 downloads/
+test_downloads/
 exports/
 logs_archive/
 _orphan_archive/
