@@ -49,6 +49,9 @@ class UnifiedQueueTask:
     download_type: str = "http"  # "http", "youtube", "huggingface", "protocol"
     download_options: Dict[str, Any] = field(default_factory=dict)
     forensics_session_id: Optional[str] = None
+    # F19: Job stage for accurate progress display (100%-but-Failed fix)
+    stage: Optional[str] = None  # DOWNLOADING | VERIFYING | FINALIZING | COMPLETE | FAILED
+    stage_message: Optional[str] = None  # Human-readable stage info
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary (ENGINE BASELINE v2.0 compatible)"""

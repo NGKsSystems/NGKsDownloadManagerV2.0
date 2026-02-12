@@ -120,7 +120,8 @@ def cmd_version(args):
     except Exception:
         pass
 
-    print(f"NGKs Download Manager v{ver}{git_rev}")
+    print(f"NGKsAcquisitionCore v{ver}{git_rev}")
+    print("Powered by: NGKsSystems")
 
 
 def cmd_ytdlp_check(args):
@@ -170,7 +171,7 @@ def cmd_logs_preset(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="ngks-dl",
-        description="NGKs Download Manager CLI (headless)",
+        description="NGKsAcquisitionCore CLI (headless) — Powered by NGKsSystems",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

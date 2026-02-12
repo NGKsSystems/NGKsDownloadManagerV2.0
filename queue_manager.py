@@ -38,6 +38,22 @@ class TaskState(Enum):
     CANCELLED = "CANCELLED"
 
 
+class TaskStage(Enum):
+    """Job stage within the download lifecycle (F19: 100%-but-Failed fix)
+    
+    - DOWNLOADING: Bytes being transferred
+    - VERIFYING: SHA256/integrity check in progress
+    - FINALIZING: Moving file, cleanup
+    - COMPLETE: All done successfully
+    - FAILED: Any stage failed
+    """
+    DOWNLOADING = "DOWNLOADING"
+    VERIFYING = "VERIFYING"
+    FINALIZING = "FINALIZING"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+
+
 @dataclass
 class QueueTask:
     """Download task model"""
@@ -65,6 +81,9 @@ class QueueTask:
     effective_priority: int = 5
     # Phase 10.4: Type-specific options for unified pipeline
     type_options: Dict[str, Any] = None
+    # F19: Job stage for accurate progress display (100%-but-Failed fix)
+    stage: Optional[str] = None  # DOWNLOADING | VERIFYING | FINALIZING | COMPLETE | FAILED
+    stage_message: Optional[str] = None  # Human-readable stage info (e.g., "Verifying SHA256...")
     
     def __post_init__(self):
         """Initialize default values after dataclass creation"""

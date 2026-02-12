@@ -585,7 +585,7 @@ class DownloadsTab(QWidget):
             type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.downloads_table.setItem(row, 2, type_item)
             
-            # Progress
+            # Progress — F19: Stage-aware progress display (100%-but-Failed fix)
             progress = download.get('progress', 0.0)
             if isinstance(progress, str):
                 # Remove % if present and convert to float
@@ -594,16 +594,39 @@ class DownloadsTab(QWidget):
                     progress = float(progress)
                 except:
                     progress = 0.0
-            progress_item = QTableWidgetItem(f"{float(progress):.1f}%")
+            
+            # F19: Adjust progress display based on stage
+            stage = download.get('stage', None)
+            stage_message = download.get('stage_message', None)
+            raw_status = download.get('status', download.get('state', 'Unknown'))
+            status_lower = str(raw_status).lower()
+            
+            if stage == 'VERIFYING':
+                # Show 99% + "Verifying..." during verification
+                progress_display = "99% Verifying..."
+            elif stage == 'FAILED' and progress >= 99.0:
+                # Failed after download completed — show 99% to indicate incomplete
+                progress_display = f"99% (Failed)"
+            elif status_lower == 'failed' and progress >= 99.0:
+                # Fallback: Failed with high progress — verification failure
+                progress_display = f"99% (Failed)"
+            elif stage == 'COMPLETE' or status_lower == 'completed':
+                progress_display = "100.0%"
+            else:
+                progress_display = f"{float(progress):.1f}%"
+            
+            progress_item = QTableWidgetItem(progress_display)
             progress_item.setFlags(progress_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.downloads_table.setItem(row, 3, progress_item)
             
             # Status (handle both status and state) — resolve BEFORE speed
-            raw_status = download.get('status', download.get('state', 'Unknown'))
             # Normalise status display: COMPLETED/completed → Completed, etc.
-            status_lower = str(raw_status).lower()
             terminal = status_lower in ('completed', 'failed', 'cancelled')
-            status_display = status_lower.capitalize() if status_lower in ('completed','failed','cancelled','downloading','queued','starting','paused') else str(raw_status)
+            # F19: Include stage_message in status if present
+            if stage_message and status_lower == 'failed':
+                status_display = f"Failed: {stage_message[:30]}" if len(stage_message) > 30 else f"Failed: {stage_message}"
+            else:
+                status_display = status_lower.capitalize() if status_lower in ('completed','failed','cancelled','downloading','queued','starting','paused') else str(raw_status)
             
             # Speed (handle both speed and speed_bps) — blank for terminal states
             if terminal:
@@ -1130,13 +1153,28 @@ class QueueTab(QWidget):
                 self.queue_table.setItem(row, 2, priority_item)
                 
                 # State
-                state_item = QTableWidgetItem(task.get('state', 'UNKNOWN'))
+                state = task.get('state', 'UNKNOWN')
+                state_item = QTableWidgetItem(state)
                 state_item.setFlags(state_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.queue_table.setItem(row, 3, state_item)
                 
-                # Progress
+                # Progress — F19: Stage-aware progress display
                 progress = task.get('progress', 0.0)
-                progress_item = QTableWidgetItem(f"{progress:.1f}%")
+                stage = task.get('stage', None)
+                state_lower = state.lower() if isinstance(state, str) else ''
+                
+                if stage == 'VERIFYING':
+                    progress_display = "99% Verifying..."
+                elif stage == 'FAILED' and progress >= 99.0:
+                    progress_display = "99% (Failed)"
+                elif state_lower == 'failed' and progress >= 99.0:
+                    progress_display = "99% (Failed)"
+                elif stage == 'COMPLETE' or state_lower == 'completed':
+                    progress_display = "100.0%"
+                else:
+                    progress_display = f"{progress:.1f}%"
+                
+                progress_item = QTableWidgetItem(progress_display)
                 progress_item.setFlags(progress_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.queue_table.setItem(row, 4, progress_item)
                 
@@ -1204,7 +1242,7 @@ class MainWindow(QMainWindow):
         self.event_manager = get_event_manager()
         
         # Setup window
-        self.setWindowTitle("NGK's Download Manager V2.0")
+        self.setWindowTitle("NGKsAcquisitionCore v2.0.1 — Powered by NGKsSystems")
         self.setMinimumSize(800, 600)
         self.resize(1000, 700)
         
@@ -1308,7 +1346,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.tab_widget)
         
         # Status bar
-        self.statusBar().showMessage("Ready - NGK's Download Manager V2.0")
+        self.statusBar().showMessage("Ready \u2014 NGKsAcquisitionCore v2.0.1 \u2014 Powered by NGKsSystems")
         self.statusBar().setFont(QFont("Segoe UI", 9))
     
     def setup_events(self):

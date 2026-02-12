@@ -287,8 +287,15 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
         file_size = 0
         hash_result = "NONE"
         error = task_dict.get("error")
+        # F19: Track job stage for accurate progress display
+        stage = "COMPLETE" if state == "COMPLETED" else ("FAILED" if state == "FAILED" else "DOWNLOADING")
+        stage_message = None
 
         if state == "COMPLETED" and os.path.exists(dest):
+            # F19: Mark stage as VERIFYING during hash check
+            stage = "VERIFYING"
+            stage_message = "Verifying SHA256..."
+            
             sha = _sha256_file(dest)
             file_size = os.path.getsize(dest)
 
@@ -297,9 +304,13 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             if expected:
                 if sha == expected:
                     hash_result = "OK"
+                    stage = "COMPLETE"
+                    stage_message = None
                 else:
                     hash_result = "MISMATCH"
                     state = "FAILED"
+                    stage = "FAILED"
+                    stage_message = "Verification failed: SHA256 mismatch"
                     error = f"HASH_MISMATCH: expected={expected} actual={sha}"
                     log_security_event("HASH_MISMATCH",
                                        task_id=tid,
@@ -314,6 +325,8 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
                     file_size = 0
             elif sha:
                 hash_result = "UNCHECKED"
+                stage = "COMPLETE"
+                stage_message = None
 
         qmeta = _quarantine_map.get(tid, {})
         expected_sha = _expected_sha256.get(tid)
@@ -324,6 +337,8 @@ def run_batch(batch: Dict[str, Any], report_path: Optional[str] = None,
             "host": _extract_host(task_url),
             "final_path": dest,
             "state": state,
+            "stage": stage,  # F19: Job stage
+            "stage_message": stage_message,  # F19: Human-readable stage info
             "bytes_total": file_size,
             "bytes_downloaded": file_size if state == "COMPLETED" else 0,
             "sha256": sha,
