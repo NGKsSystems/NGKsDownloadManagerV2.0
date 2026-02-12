@@ -1,0 +1,14 @@
+{
+  "batch_id": "minimal-smoke-test",
+  "defaults": {
+    "dest_dir": "test_downloads",
+    "connections": 1
+  },
+  "items": [
+    {
+      "id": "robots-txt",
+      "url": "https://httpbin.org/robots.txt",
+      "filename": "robots.txt"
+    }
+  ]
+}
